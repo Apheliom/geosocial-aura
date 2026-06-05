@@ -25,6 +25,65 @@ const MUNICIPALITY_METADATA = {
     "Simón Planas": { coords: "9.7833° N, 69.0167° W", bandwidth: "94.8 MHz" }
 };
 
+let realUserCoords = null;
+
+function parseCoords(coordStr) {
+    if (!coordStr) return null;
+    const parts = coordStr.split(',');
+    if (parts.length !== 2) return null;
+    
+    function parsePart(part) {
+        const clean = part.replace('°', '').trim();
+        const match = clean.match(/^([0-9.-]+)\s*([NSEW])$/i);
+        if (!match) return parseFloat(clean);
+        
+        let val = parseFloat(match[1]);
+        const dir = match[2].toUpperCase();
+        if (dir === 'S' || dir === 'W') {
+            val = -val;
+        }
+        return val;
+    }
+    
+    return {
+        lat: parsePart(parts[0]),
+        lon: parsePart(parts[1])
+    };
+}
+
+function getHaversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in km
+}
+
+function requestUserGeolocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                realUserCoords = {
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude
+                };
+                console.log("Real coordinates acquired:", realUserCoords);
+                if (typeof loadFeed === 'function') loadFeed();
+                if (typeof updateRadar === 'function') updateRadar();
+            },
+            (error) => {
+                console.warn("Geolocation permission denied or failed. Using simulated coordinates.", error);
+                realUserCoords = null;
+            },
+            { enableHighAccuracy: true, timeout: 5000 }
+        );
+    }
+}
+
 function getMunicipalityDistance(m1, m2) {
     if (!m1 || !m2) return 0;
     const name1 = m1.toLowerCase().trim();
@@ -233,6 +292,9 @@ requireAuth();
 
 document.addEventListener('DOMContentLoaded', () => {
     let user = getCurrentUser();
+    if (user) {
+        requestUserGeolocation();
+    }
 
     // --- AUDIO SPECTRUM VISUALIZER ---
     const canvasVis = document.getElementById('audio-visualizer');
@@ -773,7 +835,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 let isLocked = false;
                 let distance = 0;
                 if (p.drop_radius) {
-                    distance = getMunicipalityDistance(user.location, p.location);
+                    if (realUserCoords && p.location) {
+                        const targetMeta = MUNICIPALITY_METADATA[p.location];
+                        const targetPos = parseCoords(targetMeta?.coords);
+                        if (targetPos) {
+                            distance = getHaversineDistance(realUserCoords.lat, realUserCoords.lon, targetPos.lat, targetPos.lon);
+                        } else {
+                            distance = getMunicipalityDistance(user.location, p.location);
+                        }
+                    } else {
+                        distance = getMunicipalityDistance(user.location, p.location);
+                    }
+                    distance = Math.round(distance * 10) / 10;
                     if (distance > p.drop_radius) {
                         isLocked = true;
                     }
@@ -1340,8 +1413,23 @@ document.addEventListener('DOMContentLoaded', () => {
             
             users.forEach(u => {
                 if (u.id === user.id) return;
-                const fakeDistance = ((u.id * 7) % 49) + 1;
-                if (fakeDistance <= val) {
+                
+                let dist = 0;
+                if (realUserCoords && u.location && u.location !== 'Anónimo') {
+                    const targetMeta = MUNICIPALITY_METADATA[u.location];
+                    const targetPos = parseCoords(targetMeta?.coords);
+                    if (targetPos) {
+                        dist = getHaversineDistance(realUserCoords.lat, realUserCoords.lon, targetPos.lat, targetPos.lon);
+                    } else {
+                        dist = ((u.id * 7) % 49) + 1;
+                    }
+                } else {
+                    dist = ((u.id * 7) % 49) + 1;
+                }
+                
+                dist = Math.round(dist * 10) / 10;
+                
+                if (dist <= val) {
                     const li = document.createElement('li');
                     li.className = "flex justify-between items-center p-2 rounded bg-surface hover:bg-surface-variant/40 transition-colors border border-transparent hover:border-primary/30 cursor-pointer btn-radar-node";
                     li.dataset.id = u.id;
@@ -1350,7 +1438,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_5px_#00f2ff] pulse-breathe"></div>
                             <span class="font-status-code text-xs text-on-surface">${u.username}</span>
                         </div>
-                        <span class="font-label-caps text-[10px] text-outline">${fakeDistance} KM</span>
+                        <span class="font-label-caps text-[10px] text-outline">${dist} KM</span>
                     `;
                     radarContainer.appendChild(li);
                 }
