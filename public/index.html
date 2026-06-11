@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>GeoSocial - Dashboard</title>
+    <title>GeoSocial Aura - Dashboard</title>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com" rel="preconnect"/>
     <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -15,7 +15,6 @@
     <script src="tailwind-config.js?v=4"></script>
 
     <link rel="stylesheet" href="styles.css?v=3">
-    <script src="sound-effects.js?v=1" defer></script>
     <script src="app.js?v=3" defer></script>
 </head>
 <body class="bg-background text-on-background font-body-md min-h-screen relative overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
@@ -25,7 +24,7 @@
 <!-- TopNavBar -->
 <nav class="bg-background/80 backdrop-blur-xl docked full-width top-0 border-b border-outline-variant shadow-[0_0_15px_rgba(0,219,231,0.3)] flex justify-between items-center w-full px-margin-desktop h-16 sticky z-40">
     <div class="flex items-center gap-4 md:gap-8 overflow-hidden w-full md:w-auto">
-        <div class="font-display-lg text-headline-lg-mobile md:text-headline-lg tracking-tighter text-primary animate-pulse shrink-0">GEOSOCIAL</div>
+        <div class="font-display-lg text-headline-lg-mobile md:text-headline-lg tracking-tighter text-primary animate-pulse shrink-0">AURA</div>
         <!-- Navigation Links -->
         <div class="flex overflow-x-auto hide-scrollbar gap-4 md:gap-6 items-center h-full w-full">
             <a class="text-on-surface-variant font-medium hover:text-primary-fixed-dim transition-colors duration-300 flex flex-col justify-center h-full text-sm md:text-base shrink-0" href="#column-map" id="nav-map">MAPA</a>
@@ -35,15 +34,6 @@
         </div>
     </div>
     <div class="flex items-center gap-4 text-primary relative">
-        <canvas id="audio-visualizer" class="w-16 h-6 mr-1 bg-transparent hidden md:block" width="64" height="24"></canvas>
-        <button id="btn-volume" class="hover:text-primary-fixed-dim transition-colors duration-300 relative" title="Silenciar Sonidos">
-            <span class="material-symbols-outlined volume-on">volume_up</span>
-            <span class="material-symbols-outlined volume-off">volume_off</span>
-        </button>
-        <button id="btn-ghost" class="hover:text-primary-fixed-dim transition-colors duration-300 relative flex items-center gap-1" title="Toggle Modo Fantasma">
-            <span class="material-symbols-outlined">visibility_off</span>
-            <span id="ghost-indicator" class="hidden ghost-active-indicator"></span>
-        </button>
         <button id="btn-notifications" class="hover:text-primary-fixed-dim transition-colors duration-300 relative" title="Notificaciones">
             <span class="material-symbols-outlined">notifications</span>
             <div id="notif-badge" class="absolute top-0 right-0 w-2 h-2 bg-error rounded-full hidden shadow-[0_0_5px_red]"></div>
@@ -100,14 +90,6 @@
                     <!-- Simón Planas -->
                     <polygon data-municipality="Simón Planas" class="fill-surface-variant/40 stroke-surface-variant stroke-[0.5] hover:fill-surface-variant/60 transition-all cursor-pointer" points="50,65 80,50 90,75 60,85"></polygon>
                 </svg>
-                <div id="map-target-reticle" class="targeting-reticle"></div>
-            </div>
-            <!-- HUD Telemetry panel -->
-            <div class="hud-panel mb-4 flex flex-col gap-1 select-none">
-                <div class="flex justify-between"><span class="text-outline">SCANNER LOCK:</span> <span id="hud-lock-status" class="font-bold">STANDBY</span></div>
-                <div class="flex justify-between"><span class="text-outline">COORDINATES:</span> <span id="hud-coordinates" class="font-status-code">--.----° N, --.----° W</span></div>
-                <div class="flex justify-between"><span class="text-outline">TELEMETRY:</span> <span id="hud-telemetry-bandwidth" class="font-status-code">0.00 MHz</span></div>
-                <button id="btn-hud-action" class="mt-2 w-full py-1 bg-primary/20 text-primary border border-primary/40 text-[9px] font-label-caps rounded hover:bg-primary/30 transition-all hidden">SINTONIZAR UBICACIÓN DE NODO</button>
             </div>
             <!-- Legend -->
             <div class="flex flex-col gap-2 font-label-caps text-[10px]">
@@ -133,49 +115,21 @@
                 </div>
                 <textarea id="post-text" class="w-full bg-transparent border-none text-on-surface focus:ring-0 resize-none font-body-md placeholder:text-outline h-10 focus:h-20 transition-all outline-none" placeholder="¿Cuál es la situación en tu sector?"></textarea>
             </div>
-            <div class="flex flex-col gap-3 mt-4 pt-3 border-t border-outline-variant/50">
-                <div class="flex justify-between items-center flex-wrap gap-2">
-                    <div class="flex gap-2 items-center">
-                        <label class="text-outline hover:text-primary transition-colors p-1 cursor-pointer" title="Subir Imagen">
-                            <span class="material-symbols-outlined text-[20px]">image</span>
-                            <input type="file" id="post-image" class="hidden" accept="image/*">
-                        </label>
-                        <span id="post-image-name" class="text-[10px] text-outline truncate max-w-[80px]"></span>
-                        
-                        <!-- Telemetry Poll Builder Toggle -->
-                        <button id="btn-toggle-poll-builder" class="text-outline hover:text-primary transition-colors p-1" title="Añadir Encuesta de Telemetría">
-                            <span class="material-symbols-outlined text-[20px]">poll</span>
-                        </button>
-
-                        <!-- Data Drop Select -->
-                        <select id="post-drop-radius" class="bg-surface-dim border border-outline-variant/50 text-outline text-[9px] font-label-caps rounded px-1.5 py-0.5 outline-none focus:border-primary">
-                            <option value="">DROP: GLOBAL</option>
-                            <option value="15">DROP: 15 KM</option>
-                            <option value="30">DROP: 30 KM</option>
-                            <option value="50">DROP: 50 KM</option>
-                        </select>
-                    </div>
-                    <div class="flex gap-3 items-center flex-wrap">
-                        <!-- Red Emergency Broadcast Toggle -->
-                        <label class="flex items-center gap-1.5 cursor-pointer" title="Difusión de Sirena de Emergencia en Tiempo Real">
-                            <input id="post-emergency" class="sr-only peer" type="checkbox"/>
-                            <div class="w-8 h-4 bg-surface-variant rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-error relative"></div>
-                            <span class="font-label-caps text-[9px] text-on-surface-variant peer-checked:text-error transition-colors">DIFUSIÓN SIRENA</span>
-                        </label>
-                        
-                        <!-- Red state toggle -->
-                        <label class="flex items-center gap-1.5 cursor-pointer">
-                            <input id="post-pwr" class="sr-only peer" type="checkbox" checked/>
-                            <div class="w-8 h-4 bg-error rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary relative"></div>
-                            <span class="font-label-caps text-[9px] text-on-surface-variant peer-checked:text-primary transition-colors">ESTADO RED</span>
-                        </label>
-                        <button id="btn-transmit" class="bg-primary text-on-primary font-status-code px-4 py-1.5 rounded hover:shadow-[0_0_15px_rgba(0,219,231,0.5)] transition-all text-xs">TRANSMITIR</button>
-                    </div>
+            <div class="flex justify-between items-center mt-4 pt-3 border-t border-outline-variant/50">
+                <div class="flex gap-2 items-center">
+                    <label class="text-outline hover:text-primary transition-colors p-1 cursor-pointer" title="Subir Imagen">
+                        <span class="material-symbols-outlined text-[20px]">image</span>
+                        <input type="file" id="post-image" class="hidden" accept="image/*">
+                    </label>
+                    <span id="post-image-name" class="text-[10px] text-outline truncate max-w-[120px]"></span>
                 </div>
-                <!-- Poll builder panel -->
-                <div id="poll-builder-panel" class="hidden p-2 border border-outline-variant/30 rounded bg-surface-dim/50 flex flex-col gap-1.5">
-                    <label class="font-label-caps text-[8px] text-outline">PREGUNTA DE ENCUESTA (SÍ / NO)</label>
-                    <input type="text" id="poll-builder-question" class="w-full bg-surface-variant text-on-surface text-xs rounded px-2 py-1 outline-none border border-transparent focus:border-primary" placeholder="Ej: ¿Tienes servicio de agua estable en tu calle?">
+                <div class="flex gap-3 items-center">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input id="post-pwr" class="sr-only peer" type="checkbox" checked/>
+                        <div class="w-8 h-4 bg-error rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary relative"></div>
+                        <span class="font-label-caps text-[10px] text-on-surface-variant peer-checked:text-primary transition-colors">ESTADO RED</span>
+                    </label>
+                    <button id="btn-transmit" class="bg-primary text-on-primary font-status-code px-4 py-1 rounded hover:shadow-[0_0_15px_rgba(0,219,231,0.5)] transition-all">TRANSMITIR</button>
                 </div>
             </div>
         </div>
@@ -200,7 +154,6 @@
                 <div class="absolute w-full h-[1px] bg-primary/20"></div>
                 <div class="absolute h-full w-[1px] bg-primary/20"></div>
                 <div class="absolute inset-0 radar-sweep rounded-full mix-blend-screen"></div>
-                <div id="radar-pulse-ring" class="radar-pulse hidden"></div>
                 <div class="w-2 h-2 bg-primary rounded-full shadow-[0_0_8px_#00f2ff] relative z-10"></div>
                 <!-- Interactive Radar Dots (Simulated) -->
                 <div class="absolute w-1.5 h-1.5 bg-secondary rounded-full shadow-[0_0_5px_#ffabf3] top-[30%] left-[60%] animate-pulse"></div>
@@ -281,14 +234,14 @@
 
 <!-- Threads & Synthesis Modal (Detail view) -->
 <div id="thread-modal" class="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 md:p-8">
-    <main id="thread-modal-container" class="cyber-glass w-full max-w-7xl rounded-xl overflow-hidden flex flex-col md:flex-row shadow-[0_10px_40px_rgba(0,0,0,0.8)] border-outline-variant h-[90vh] md:h-[80vh] relative z-10">
+    <main class="cyber-glass w-full max-w-7xl rounded-xl overflow-hidden flex flex-col md:flex-row shadow-[0_10px_40px_rgba(0,0,0,0.8)] border-outline-variant h-[90vh] md:h-[80vh] relative z-10">
         <!-- Close Button -->
         <button id="close-thread-modal" class="absolute top-4 right-4 z-50 text-outline hover:text-primary transition-colors p-2 rounded-full hover:bg-surface-variant/50 group">
             <span class="material-symbols-outlined">close</span>
         </button>
         
         <!-- Left Side: Original Post Canvas -->
-        <section id="thread-left-canvas" class="w-full md:w-1/2 flex flex-col border-b md:border-b-0 md:border-r border-outline-variant/30 bg-surface-container-lowest/40 h-1/2 md:h-full overflow-hidden relative group">
+        <section class="w-full md:w-1/2 flex flex-col border-b md:border-b-0 md:border-r border-outline-variant/30 bg-surface-container-lowest/40 h-1/2 md:h-full overflow-hidden relative group">
             <!-- Municipal Badge / Header -->
             <div class="absolute top-0 left-0 w-full p-4 z-20 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between">
                 <div id="thread-post-badge" class="flex items-center gap-2 bg-error-container/20 border border-error/30 px-3 py-1.5 rounded-sm backdrop-blur-md">
@@ -319,7 +272,7 @@
         </section>
         
         <!-- Right Side: Threads & Comments -->
-        <section id="thread-right-comments" class="w-full md:w-1/2 h-1/2 md:h-full flex flex-col bg-surface-container-low/60 relative">
+        <section class="w-full md:w-1/2 h-1/2 md:h-full flex flex-col bg-surface-container-low/60 relative">
             <!-- Header -->
             <header class="p-4 border-b border-outline-variant/30 flex justify-between items-center bg-surface-container-lowest/80 backdrop-blur-md">
                 <div class="flex items-center gap-2">
@@ -360,17 +313,6 @@
 <div class="map-tooltip hidden bg-surface-container-high border border-outline-variant p-3 rounded shadow-lg fixed pointer-events-none z-50 text-xs text-on-surface">
     <!-- Updated by JS -->
 </div>
-
-<!-- Emergency Siren Screen overlay -->
-<div id="emergency-siren-overlay" class="hidden" style="display: none;">
-    <div class="animate-pulse flex flex-col items-center justify-center text-center p-6 bg-black/80 rounded-lg border-2 border-error max-w-md">
-        <span class="material-symbols-outlined text-[64px] text-error mb-4">warning</span>
-        <h2 class="font-display-lg text-2xl text-error mb-2 tracking-widest font-bold">DIFUSIÓN DE EMERGENCIA</h2>
-        <p id="emergency-siren-text" class="font-body-md text-sm text-on-surface-variant mb-6">ALERTA CRÍTICA: Se ha reportado una falla severa en la infraestructura de la red.</p>
-        <button id="btn-dismiss-emergency" class="px-6 py-3 bg-error text-on-error font-status-code rounded hover:shadow-[0_0_15px_rgba(255,180,171,0.6)] glow-btn-red-hover transition-all">CONFIRMAR LECTURA / APAGAR SIRENA</button>
-    </div>
-</div>
-<div id="glitch-overlay"></div>
 
 </body>
 </html>

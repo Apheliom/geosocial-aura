@@ -1,273 +1,5 @@
 const API_URL = '/api';
 
-// --- GEOSOCIAL AURA CYBERPUNK EXTENSIONS ---
-const MUNICIPALITY_DISTANCES = {
-    "iribarren": { "iribarren": 0, "palavecino": 12, "crespo": 38, "urdaneta": 78, "torres": 98, "jiménez": 35, "morán": 65, "andrés eloy blanco": 82, "simón planas": 45 },
-    "palavecino": { "iribarren": 12, "palavecino": 0, "crespo": 45, "urdaneta": 88, "torres": 110, "jiménez": 47, "morán": 77, "andrés eloy blanco": 90, "simón planas": 35 },
-    "crespo": { "iribarren": 38, "palavecino": 45, "crespo": 0, "urdaneta": 72, "torres": 135, "jiménez": 73, "morán": 103, "andrés eloy blanco": 118, "simón planas": 78 },
-    "urdaneta": { "iribarren": 78, "palavecino": 88, "crespo": 72, "urdaneta": 0, "torres": 105, "jiménez": 108, "morán": 138, "andrés eloy blanco": 150, "simón planas": 120 },
-    "torres": { "iribarren": 98, "palavecino": 110, "crespo": 135, "urdaneta": 105, "torres": 0, "jiménez": 63, "morán": 90, "andrés eloy blanco": 115, "simón planas": 140 },
-    "jiménez": { "iribarren": 35, "palavecino": 47, "crespo": 73, "urdaneta": 108, "torres": 63, "jiménez": 0, "morán": 30, "andrés eloy blanco": 48, "simón planas": 80 },
-    "morán": { "iribarren": 65, "palavecino": 77, "crespo": 103, "urdaneta": 138, "torres": 90, "jiménez": 30, "morán": 0, "andrés eloy blanco": 25, "simón planas": 98 },
-    "andrés eloy blanco": { "iribarren": 82, "palavecino": 90, "crespo": 118, "urdaneta": 150, "torres": 115, "jiménez": 48, "morán": 25, "andrés eloy blanco": 0, "simón planas": 95 },
-    "simón planas": { "iribarren": 45, "palavecino": 35, "crespo": 78, "urdaneta": 120, "torres": 140, "jiménez": 80, "morán": 98, "andrés eloy blanco": 95, "simón planas": 0 }
-};
-
-const MUNICIPALITY_METADATA = {
-    "Torres": { coords: "10.1583° N, 70.0833° W", bandwidth: "142.5 MHz" },
-    "Urdaneta": { coords: "10.5833° N, 69.5833° W", bandwidth: "98.2 MHz" },
-    "Crespo": { coords: "10.2833° N, 69.1667° W", bandwidth: "115.6 MHz" },
-    "Iribarren": { coords: "10.0667° N, 69.3167° W", bandwidth: "256.4 MHz" },
-    "Palavecino": { coords: "10.0632° N, 69.2528° W", bandwidth: "188.1 MHz" },
-    "Jiménez": { coords: "9.9167° N, 69.5667° W", bandwidth: "88.7 MHz" },
-    "Morán": { coords: "9.7833° N, 69.8000° W", bandwidth: "120.3 MHz" },
-    "Andrés Eloy Blanco": { coords: "9.7167° N, 69.5333° W", bandwidth: "72.4 MHz" },
-    "Simón Planas": { coords: "9.7833° N, 69.0167° W", bandwidth: "94.8 MHz" }
-};
-
-let realUserCoords = null;
-
-function parseCoords(coordStr) {
-    if (!coordStr) return null;
-    const parts = coordStr.split(',');
-    if (parts.length !== 2) return null;
-    
-    function parsePart(part) {
-        const clean = part.replace('°', '').trim();
-        const match = clean.match(/^([0-9.-]+)\s*([NSEW])$/i);
-        if (!match) return parseFloat(clean);
-        
-        let val = parseFloat(match[1]);
-        const dir = match[2].toUpperCase();
-        if (dir === 'S' || dir === 'W') {
-            val = -val;
-        }
-        return val;
-    }
-    
-    return {
-        lat: parsePart(parts[0]),
-        lon: parsePart(parts[1])
-    };
-}
-
-function getHaversineDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Radius of the Earth in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in km
-}
-
-function requestUserGeolocation() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                realUserCoords = {
-                    lat: position.coords.latitude,
-                    lon: position.coords.longitude
-                };
-                console.log("Real coordinates acquired:", realUserCoords);
-                if (typeof loadFeed === 'function') loadFeed();
-                if (typeof updateRadar === 'function') updateRadar();
-            },
-            (error) => {
-                console.warn("Geolocation permission denied or failed. Using simulated coordinates.", error);
-                realUserCoords = null;
-            },
-            { enableHighAccuracy: true, timeout: 5000 }
-        );
-    }
-}
-
-function getMunicipalityDistance(m1, m2) {
-    if (!m1 || !m2) return 0;
-    const name1 = m1.toLowerCase().trim();
-    const name2 = m2.toLowerCase().trim();
-    if (MUNICIPALITY_DISTANCES[name1] && MUNICIPALITY_DISTANCES[name1][name2] !== undefined) {
-        return MUNICIPALITY_DISTANCES[name1][name2];
-    }
-    return name1 === name2 ? 0 : 50;
-}
-
-function decryptText(element, finalProductText, duration = 800) {
-    if (!element) return;
-    const chars = "010101ABCDEF#%&*@<>/[]{}";
-    const finalLength = finalProductText.length;
-    let frame = 0;
-    const totalFrames = 15;
-    const intervalTime = duration / totalFrames;
-    
-    const originalText = finalProductText;
-    
-    const decryptInterval = setInterval(() => {
-        let currentText = "";
-        const progress = frame / totalFrames;
-        const revealIndex = Math.floor(progress * finalLength);
-        
-        for (let i = 0; i < finalLength; i++) {
-            if (i < revealIndex) {
-                currentText += originalText[i];
-            } else if (originalText[i] === " ") {
-                currentText += " ";
-            } else {
-                currentText += chars[Math.floor(Math.random() * chars.length)];
-            }
-        }
-        
-        element.textContent = currentText;
-        frame++;
-        
-        if (frame > totalFrames) {
-            clearInterval(decryptInterval);
-            element.textContent = originalText;
-        }
-    }, intervalTime);
-}
-
-const animatedMessageIds = new Set();
-let lastOpenedPostId = null;
-let emergencySirenInterval = null;
-
-function triggerGlitchEffect() {
-    let overlay = document.getElementById('glitch-overlay');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'glitch-overlay';
-        document.body.appendChild(overlay);
-    }
-    
-    if (window.soundEffects) {
-        window.soundEffects.playGlitchSound();
-    }
-    
-    overlay.classList.remove('glitch-active');
-    void overlay.offsetWidth;
-    overlay.classList.add('glitch-active');
-    
-    setTimeout(() => {
-        overlay.classList.remove('glitch-active');
-    }, 300);
-}
-
-function triggerEmergencySiren(text) {
-    const overlay = document.getElementById('emergency-siren-overlay');
-    const sirenText = document.getElementById('emergency-siren-text');
-    
-    if (overlay) {
-        if (sirenText && text) {
-            sirenText.textContent = text;
-        }
-        overlay.style.display = 'flex';
-        overlay.classList.remove('hidden');
-    }
-    
-    if (!emergencySirenInterval) {
-        if (window.soundEffects) window.soundEffects.playEmergencySiren();
-        emergencySirenInterval = setInterval(() => {
-            if (window.soundEffects) window.soundEffects.playEmergencySiren();
-        }, 1500);
-    }
-}
-
-function stopEmergencySiren() {
-    const overlay = document.getElementById('emergency-siren-overlay');
-    if (overlay) {
-        overlay.style.display = 'none';
-        overlay.classList.add('hidden');
-    }
-    if (emergencySirenInterval) {
-        clearInterval(emergencySirenInterval);
-        emergencySirenInterval = null;
-    }
-}
-
-function startBurnNoteTicker() {
-    if (window.burnNoteTickerInterval) clearInterval(window.burnNoteTickerInterval);
-    window.burnNoteTickerInterval = setInterval(() => {
-        const bubbles = document.querySelectorAll('[data-opened-at]');
-        bubbles.forEach(bubble => {
-            const burnTime = parseInt(bubble.dataset.burnTime);
-            const openedAtStr = bubble.dataset.openedAt;
-            if (!openedAtStr) return; // Not opened yet
-            
-            const openedTime = new Date(openedAtStr.replace(' ', 'T') + 'Z').getTime();
-            const elapsed = Math.floor((Date.now() - openedTime) / 1000);
-            
-            const totalBurnTime = burnTime === -1 ? 15 : burnTime;
-            const timeLeft = totalBurnTime - elapsed;
-            
-            const timerEl = bubble.querySelector('.burn-timer-val');
-            const textEl = bubble.querySelector('.chat-message-text');
-            
-            if (timeLeft <= 0) {
-                if (!bubble.classList.contains('burning')) {
-                    bubble.classList.add('burning');
-                    if (window.soundEffects) window.soundEffects.playGlitchSound();
-                    
-                    if (textEl) {
-                        textEl.textContent = "██████████████";
-                        textEl.classList.add('text-error', 'animate-pulse');
-                    }
-                    if (timerEl) {
-                        timerEl.parentNode.innerHTML = "🔥 SEÑAL PURGADA";
-                    }
-                    
-                    setTimeout(() => {
-                        bubble.style.transition = 'all 0.5s ease-out';
-                        bubble.style.opacity = '0';
-                        bubble.style.height = '0';
-                        bubble.style.padding = '0';
-                        bubble.style.margin = '0';
-                        setTimeout(() => bubble.remove(), 500);
-                    }, 1000);
-                }
-            } else {
-                if (timerEl) {
-                    timerEl.textContent = timeLeft;
-                }
-            }
-        });
-    }, 1000);
-}
-
-function startRadarSonarSweep() {
-    const pulseRing = document.getElementById('radar-pulse-ring');
-    if (pulseRing) {
-        pulseRing.classList.remove('hidden');
-    }
-    
-    setInterval(() => {
-        
-        // Glow avatars / list items
-        const nodes = document.querySelectorAll('#radar-users li, .btn-radar-node');
-        nodes.forEach(node => {
-            node.style.transition = 'all 0.3s ease-out';
-            node.style.borderColor = 'rgba(0, 242, 255, 0.8)';
-            node.style.boxShadow = '0 0 10px rgba(0, 242, 255, 0.4)';
-            
-            setTimeout(() => {
-                node.style.borderColor = 'transparent';
-                node.style.boxShadow = 'none';
-            }, 800);
-        });
-
-        // Glow absolute positioning dots in radar
-        const dotElements = document.querySelectorAll('.radar-sweep ~ div:not(#radar-pulse-ring)');
-        dotElements.forEach(dot => {
-            dot.style.transition = 'all 0.3s ease';
-            dot.style.transform = 'scale(2.5)';
-            setTimeout(() => {
-                dot.style.transform = 'scale(1)';
-            }, 800);
-        });
-    }, 3000);
-}
-
 // --- AUTHENTICATION ---
 function getCurrentUser() {
     const userStr = sessionStorage.getItem('currentUser');
@@ -292,150 +24,6 @@ requireAuth();
 
 document.addEventListener('DOMContentLoaded', () => {
     let user = getCurrentUser();
-    if (user) {
-        requestUserGeolocation();
-    }
-
-    // --- AUDIO SPECTRUM VISUALIZER ---
-    const canvasVis = document.getElementById('audio-visualizer');
-    if (canvasVis && window.soundEffects) {
-        window.soundEffects.setCanvas(canvasVis);
-    }
-
-    // --- GHOST MODE ---
-    const btnGhost = document.getElementById('btn-ghost');
-    const ghostIndicator = document.getElementById('ghost-indicator');
-    
-    function updateGhostUI() {
-        if (!user) return;
-        if (user.is_ghost) {
-            if (ghostIndicator) ghostIndicator.classList.remove('hidden');
-            if (btnGhost) btnGhost.classList.add('text-error');
-        } else {
-            if (ghostIndicator) ghostIndicator.classList.add('hidden');
-            if (btnGhost) btnGhost.classList.remove('text-error');
-        }
-    }
-    
-    if (btnGhost && user) {
-        updateGhostUI();
-        btnGhost.addEventListener('click', async () => {
-            const nextGhostState = !user.is_ghost;
-            try {
-                const res = await fetch(`${API_URL}/users/${user.id}/ghost`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ is_ghost: nextGhostState })
-                });
-                const data = await res.json();
-                if (res.ok && data.success) {
-                    user.is_ghost = nextGhostState;
-                    sessionStorage.setItem('currentUser', JSON.stringify(user));
-                    updateGhostUI();
-                    if (window.soundEffects) {
-                        window.soundEffects.playGlitchSound();
-                    }
-                    loadFeed();
-                    loadStories();
-                    updateUserUI();
-                }
-            } catch (err) {
-                console.error("Error toggling Ghost Mode:", err);
-            }
-        });
-    }
-
-    // --- POLL BUILDER PANEL TOGGLE ---
-    const btnTogglePollBuilder = document.getElementById('btn-toggle-poll-builder');
-    const pollBuilderPanel = document.getElementById('poll-builder-panel');
-    if (btnTogglePollBuilder && pollBuilderPanel) {
-        btnTogglePollBuilder.addEventListener('click', () => {
-            pollBuilderPanel.classList.toggle('hidden');
-            if (window.soundEffects) window.soundEffects.playClick();
-        });
-    }
-
-    // --- DISMISS EMERGENCY BROADCAST ---
-    const btnDismissEmergency = document.getElementById('btn-dismiss-emergency');
-    if (btnDismissEmergency) {
-        btnDismissEmergency.addEventListener('click', async () => {
-            stopEmergencySiren();
-            if (user) {
-                await fetch(`${API_URL}/notifications/read/${user.id}`, { method: 'POST' });
-                if (window.fetchNotifications) {
-                    window.fetchNotifications();
-                }
-            }
-        });
-    }
-
-    // --- CYBERPUNK CHRONO TICKERS ---
-    if (user) {
-        startBurnNoteTicker();
-    }
-    startRadarSonarSweep();
-
-    // --- AUDIO VOLUME CONTROLLER ---
-    const btnVolume = document.getElementById('btn-volume');
-    if (btnVolume && window.soundEffects) {
-        if (window.soundEffects.isMuted()) {
-            btnVolume.classList.add('mute-active');
-        }
-        btnVolume.addEventListener('click', () => {
-            const isMuted = window.soundEffects.toggleMuted();
-            if (isMuted) {
-                btnVolume.classList.add('mute-active');
-            } else {
-                btnVolume.classList.remove('mute-active');
-                window.soundEffects.playClick();
-            }
-        });
-    }
-
-    // Global Click Listener for Cyberpunk HUD feedback
-    document.addEventListener('click', (e) => {
-        const target = e.target.closest('button, a, [role="button"], polygon, .btn-story-node, .btn-radar-node');
-        if (target) {
-            if (target.id === 'btn-volume') return;
-            if (window.soundEffects) {
-                window.soundEffects.playClick();
-            }
-        }
-    });
-
-    // PING Telemetry HUD
-    function startPingTelemetry() {
-        const userUIContainer = document.querySelector('.current-user-name');
-        if (!userUIContainer) return;
-        
-        const pingContainer = document.createElement('span');
-        pingContainer.id = 'hud-ping-telemetry';
-        pingContainer.className = 'font-status-code text-[10px] text-primary/80 ml-2 border border-primary/20 bg-primary/5 px-1.5 py-0.5 rounded hidden md:inline';
-        pingContainer.textContent = 'PING: --';
-        userUIContainer.parentNode.insertBefore(pingContainer, userUIContainer);
-        
-        setInterval(async () => {
-            const startTime = Date.now();
-            try {
-                const res = await fetch(`${API_URL}/users?_t=${startTime}`);
-                if (res.ok) {
-                    const latency = Date.now() - startTime;
-                    pingContainer.textContent = `PING: ${latency}ms`;
-                    if (latency > 150) {
-                        pingContainer.className = 'font-status-code text-[10px] text-error border border-error/20 bg-error/5 px-1.5 py-0.5 rounded hidden md:inline';
-                    } else {
-                        pingContainer.className = 'font-status-code text-[10px] text-primary/80 border border-primary/20 bg-primary/5 px-1.5 py-0.5 rounded hidden md:inline';
-                    }
-                }
-            } catch (e) {
-                pingContainer.textContent = 'SIGNAL LOSS';
-                pingContainer.className = 'font-status-code text-[10px] text-error border border-error/20 bg-error/5 px-1.5 py-0.5 rounded hidden md:inline animate-pulse';
-            }
-        }, 3000);
-    }
-    if (user) {
-        startPingTelemetry();
-    }
 
     // --- LOGIN / REGISTER PAGE LOGIC ---
     const formLogin = document.getElementById('form-login');
@@ -596,100 +184,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        let isInitialNotifLoad = true;
-        const shownNotifications = new Set();
-
-        async function showToastNotification(n) {
-            // No mostrar Toasts de chat si ya estamos chateando con esa misma persona en la vista de Nodos
-            if (window.location.pathname.endsWith('/nodes') && typeof activeChatUser !== 'undefined' && activeChatUser == n.sender_id) {
-                return;
-            }
-
-            let toastContainer = document.getElementById('toast-container');
-            if (!toastContainer) {
-                toastContainer = document.createElement('div');
-                toastContainer.id = 'toast-container';
-                document.body.appendChild(toastContainer);
-            }
-
-            const toast = document.createElement('div');
-            const themeClass = n.type === 'message' ? 'toast-secondary' : '';
-            toast.className = `toast-item ${themeClass}`;
-
-            const headerText = n.type === 'message' ? 'TRANSMISIÓN DE CHAT' : 'ALERTA DE FRECUENCIA';
-            const icon = n.type === 'message' ? 'chat_bubble' : 'notifications';
-            const actionText = n.type === 'message' ? 'HAGA CLIC PARA ABRIR CHAT' : 'HAGA CLIC PARA VER';
-
-            let bodyText = "";
-            if (n.type === 'like') bodyText = `A @${n.sender_name} le gustó tu transmisión.`;
-            else if (n.type === 'comment') bodyText = `@${n.sender_name} comentó tu reporte.`;
-            else if (n.type === 'share') bodyText = `@${n.sender_name} retransmitió tu reporte.`;
-            else if (n.type === 'message') {
-                try {
-                    const msgRes = await fetch(`${API_URL}/messages/${user.id}/${n.sender_id}`);
-                    const msgs = await msgRes.json();
-                    const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1].content : "Mensaje cifrado recibido.";
-                    const preview = lastMsg.length > 35 ? lastMsg.substring(0, 32) + '...' : lastMsg;
-                    bodyText = `De @${n.sender_name}: "${preview}"`;
-                } catch (e) {
-                    bodyText = `De @${n.sender_name}: mensaje cifrado entrante.`;
-                }
-            }
-
-            toast.innerHTML = `
-                <div class="toast-header">
-                    <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">${icon}</span> ${headerText}</span>
-                    <button class="toast-close">&times;</button>
-                </div>
-                <div class="toast-body">
-                    ${bodyText}
-                </div>
-                <div class="toast-footer font-status-code">
-                    ${actionText}
-                </div>
-            `;
-
-            if (window.soundEffects) {
-                window.soundEffects.playNotification();
-            }
-
-            toast.querySelector('.toast-close').addEventListener('click', (e) => {
-                e.stopPropagation();
-                dismissToast(toast);
-            });
-
-            toast.addEventListener('click', () => {
-                dismissToast(toast);
-                if (n.type === 'message') {
-                    window.location.href = `/nodes?chat_user=${n.sender_id}`;
-                } else {
-                    const feedCol = document.getElementById('column-feed');
-                    if (feedCol) {
-                        feedCol.scrollIntoView({ behavior: 'smooth' });
-                    } else {
-                        window.location.href = '/#column-feed';
-                    }
-                }
-            });
-
-            toastContainer.appendChild(toast);
-
-            setTimeout(() => {
-                if (toast.parentNode) {
-                    dismissToast(toast);
-                }
-            }, 6000);
-        }
-
-        function dismissToast(toast) {
-            toast.classList.add('toast-exit');
-            toast.addEventListener('animationend', () => {
-                if (toast.parentNode) {
-                    toast.parentNode.removeChild(toast);
-                }
-            });
-        }
-
         async function fetchNotifications() {
             try {
                 const res = await fetch(`${API_URL}/notifications/${user.id}`);
@@ -711,28 +205,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (n.type === 'comment') text = `<b class="text-primary">${n.sender_name}</b> comentó tu publicación.`;
                         if (n.type === 'message') text = `<b class="text-primary">${n.sender_name}</b> te envió un mensaje cifrado.`;
                         if (n.type === 'share') text = `<b class="text-primary">${n.sender_name}</b> compartió tu publicación.`;
-                        if (n.type === 'emergency') text = `<span class="text-error font-bold flex items-center gap-1"><span class="material-symbols-outlined text-xs animate-pulse">crisis_alert</span> DIFUSIÓN DE EMERGENCIA</span>`;
                         return `<li class="p-3 border-b border-outline-variant/30 text-xs ${!n.is_read ? 'bg-primary/10' : ''}">${text}</li>`;
                     }).join('');
                 }
- 
-                // Procesar Toasts para nuevas notificaciones no leídas
-                data.forEach(n => {
-                    if (!n.is_read && !shownNotifications.has(n.id)) {
-                        if (n.type === 'emergency') {
-                            triggerEmergencySiren(`ALERTA CRÍTICA DE @${n.sender_name.toUpperCase()}: DIFUSIÓN DE EMERGENCIA EN FRECUENCIA GENERAL.`);
-                        } else if (!isInitialNotifLoad) {
-                            showToastNotification(n);
-                        }
-                        shownNotifications.add(n.id);
-                    }
-                });
-
-                isInitialNotifLoad = false;
             } catch(e) {}
         }
         
-        window.fetchNotifications = fetchNotifications;
         fetchNotifications();
         setInterval(fetchNotifications, 5000);
     }
@@ -768,26 +246,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (navMap) {
         navMap.addEventListener('click', (e) => {
-            if (document.getElementById('column-map')) {
-                e.preventDefault();
-                highlightColumn('column-map');
-            }
+            e.preventDefault();
+            highlightColumn('column-map');
         });
     }
     if (navFeed) {
         navFeed.addEventListener('click', (e) => {
-            if (document.getElementById('column-feed')) {
-                e.preventDefault();
-                highlightColumn('column-feed');
-            }
+            e.preventDefault();
+            highlightColumn('column-feed');
         });
     }
     if (navRadar) {
         navRadar.addEventListener('click', (e) => {
-            if (document.getElementById('column-radar')) {
-                e.preventDefault();
-                highlightColumn('column-radar');
-            }
+            e.preventDefault();
+            highlightColumn('column-radar');
         });
     }
 
@@ -831,98 +303,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             posts.forEach(p => {
                 const article = document.createElement('article');
+                article.className = "bg-surface-container-low/90 backdrop-blur-md rounded-lg border border-outline-variant overflow-hidden mb-6 glow-accent-hover transition-all duration-300";
                 
-                let isLocked = false;
-                let distance = 0;
-                if (p.drop_radius) {
-                    if (realUserCoords && p.location) {
-                        const targetMeta = MUNICIPALITY_METADATA[p.location];
-                        const targetPos = parseCoords(targetMeta?.coords);
-                        if (targetPos) {
-                            distance = getHaversineDistance(realUserCoords.lat, realUserCoords.lon, targetPos.lat, targetPos.lon);
-                        } else {
-                            distance = getMunicipalityDistance(user.location, p.location);
-                        }
-                    } else {
-                        distance = getMunicipalityDistance(user.location, p.location);
-                    }
-                    distance = Math.round(distance * 10) / 10;
-                    if (distance > p.drop_radius) {
-                        isLocked = true;
-                    }
-                }
-
-                if (isLocked) {
-                    article.className = "bg-surface-container-low/90 backdrop-blur-md rounded-lg border border-outline-variant overflow-hidden mb-6 locked-drop-card transition-all duration-300";
-                } else {
-                    article.className = "bg-surface-container-low/90 backdrop-blur-md rounded-lg border border-outline-variant overflow-hidden mb-6 glow-accent-hover transition-all duration-300";
-                }
-                
-                const mediaHTML = (p.image && !isLocked) ? `
+                const mediaHTML = p.image ? `
                 <div class="w-full aspect-video bg-surface-dim relative border-y border-outline-variant/30 overflow-hidden cursor-pointer btn-open-thread" data-id="${p.id}">
                     <img src="${p.image}" class="w-full h-full object-cover opacity-85 hover:opacity-100 transition-opacity duration-300">
                 </div>` : '';
 
                 const statusIndicatorClass = p.has_power ? "bg-primary shadow-[0_0_8px_#00f2ff] pulse-breathe" : "bg-error shadow-[0_0_8px_#ffb4ab] pulse-strobe";
 
-                const sharedHTML = (p.original_post_id && !isLocked) ? `
+                const sharedHTML = p.original_post_id ? `
                 <div class="mx-3 mt-3 p-3 border border-outline-variant/50 rounded bg-surface-dim/50 italic text-xs text-on-surface-variant">
                     <span class="text-[9px] font-label-caps text-outline mb-1 block">RETRANSMISIÓN DE NODO: ${p.original_author ? p.original_author.toUpperCase() : 'DESCONOCIDO'}</span>
                     "${p.original_content}"
                 </div>
                 ` : '';
-
-                const displayContent = isLocked 
-                    ? `<span class="font-status-code text-error flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]">lock</span>[SEÑAL BLOQUEADA: FUERA DE RANGO. DISTANCIA: ${distance} KM / ALCANCE: ${p.drop_radius} KM]</span>`
-                    : p.content;
-
-                let pollHTML = '';
-                if (p.has_poll && p.poll_stats && !isLocked) {
-                    const stats = p.poll_stats;
-                    const total = stats.total_count || 0;
-                    const opt1Pct = total > 0 ? Math.round((stats.opt1_count / total) * 100) : 0;
-                    const opt2Pct = total > 0 ? Math.round((stats.opt2_count / total) * 100) : 0;
-                    const hasVoted = stats.user_voted_option !== null;
-                    
-                    pollHTML = `
-                    <div class="mt-3 p-3 border border-outline-variant/30 rounded bg-surface-dim/40 flex flex-col gap-2 font-mono text-xs">
-                        <div class="font-bold text-primary flex items-center gap-1.5 mb-1">
-                            <span class="material-symbols-outlined text-[16px]">poll</span>
-                            <span>ENCUESTA DE TELEMETRÍA: ${p.poll_question}</span>
-                        </div>
-                        <div class="flex flex-col gap-1">
-                            <div class="flex justify-between items-center text-[10px]">
-                                <span>SÍ (ESTABLE)</span>
-                                <span class="font-status-code">${stats.opt1_count} votos (${opt1Pct}%)</span>
-                            </div>
-                            <div class="poll-bar-bg">
-                                <div class="poll-bar-fill" style="width: ${opt1Pct}%"></div>
-                            </div>
-                        </div>
-                        <div class="flex flex-col gap-1">
-                            <div class="flex justify-between items-center text-[10px]">
-                                <span>NO (CRÍTICO)</span>
-                                <span class="font-status-code">${stats.opt2_count} votos (${opt2Pct}%)</span>
-                            </div>
-                            <div class="poll-bar-bg">
-                                <div class="poll-bar-fill bg-error shadow-[0_0_8px_rgba(255,180,171,0.4)]" style="width: ${opt2Pct}%"></div>
-                            </div>
-                        </div>
-                        ${!hasVoted ? `
-                        <div class="flex gap-2 mt-2">
-                            <button class="flex-1 py-1 px-2 border border-primary/40 hover:bg-primary/10 text-primary text-[10px] rounded transition-all btn-vote" data-post-id="${p.id}" data-option="opt1">SÍ</button>
-                            <button class="flex-1 py-1 px-2 border border-error/40 hover:bg-error/10 text-error text-[10px] rounded transition-all btn-vote" data-post-id="${p.id}" data-option="opt2">NO</button>
-                        </div>
-                        ` : `
-                        <div class="text-[9px] text-outline mt-1 italic text-center">
-                            Reporte registrado (Opción: ${stats.user_voted_option === 'opt1' ? 'SÍ' : 'NO'})
-                        </div>
-                        `}
-                    </div>
-                    `;
-                }
-
-                const openThreadBtnClass = isLocked ? "opacity-30 pointer-events-none" : "btn-open-thread";
 
                 article.innerHTML = `
                 <div class="p-3 flex items-center justify-between border-b border-outline-variant/50">
@@ -944,19 +339,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${sharedHTML}
                 ${mediaHTML}
                 <div class="p-3 flex flex-col gap-2">
-                    <p class="font-body-md text-sm text-on-surface-variant ${isLocked ? '' : 'cursor-pointer btn-open-thread'}" data-id="${p.id}">${displayContent}</p>
-                    ${pollHTML}
+                    <p class="font-body-md text-sm text-on-surface-variant cursor-pointer btn-open-thread" data-id="${p.id}">${p.content}</p>
                     <div class="flex justify-between items-center text-outline mt-2 pt-2 border-t border-outline-variant/30">
                         <div class="flex gap-4">
-                            <button class="hover:text-primary transition-colors flex items-center gap-1 btn-like" data-id="${p.id}" ${isLocked ? 'disabled' : ''}>
+                            <button class="hover:text-primary transition-colors flex items-center gap-1 btn-like" data-id="${p.id}">
                                 <span class="material-symbols-outlined text-[18px] ${p.user_liked ? 'text-primary' : ''}">favorite</span>
                                 <span class="text-xs font-status-code">${p.like_count}</span>
                             </button>
-                            <button class="hover:text-primary transition-colors flex items-center gap-1 ${openThreadBtnClass}" data-id="${p.id}" ${isLocked ? 'disabled' : ''}>
+                            <button class="hover:text-primary transition-colors flex items-center gap-1 btn-open-thread" data-id="${p.id}">
                                 <span class="material-symbols-outlined text-[18px]">chat_bubble</span>
                                 <span class="text-xs font-status-code">${p.comment_count}</span>
                             </button>
-                            <button class="hover:text-primary transition-colors flex items-center gap-1 btn-share" data-id="${p.id}" data-content="${p.content}" data-author="${p.name}" ${isLocked ? 'disabled' : ''}>
+                            <button class="hover:text-primary transition-colors flex items-center gap-1 btn-share" data-id="${p.id}" data-content="${p.content}" data-author="${p.name}">
                                 <span class="material-symbols-outlined text-[18px]">share</span>
                             </button>
                         </div>
@@ -982,30 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: {'Content-Type':'application/json'},
                     body: JSON.stringify({ user_id: user.id })
                 });
-                if (window.soundEffects) window.soundEffects.playLike();
                 loadFeed();
-            });
-        });
-
-        document.querySelectorAll('.btn-vote').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const postId = btn.dataset.postId;
-                const option = btn.dataset.option;
-                try {
-                    const res = await fetch(`${API_URL}/posts/${postId}/vote`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ user_id: user.id, vote_option: option })
-                    });
-                    if (res.ok) {
-                        if (window.soundEffects) window.soundEffects.playClick();
-                        loadFeed();
-                        updateMapVisuals();
-                    }
-                } catch (err) {
-                    console.error("Error voting:", err);
-                }
             });
         });
 
@@ -1087,22 +458,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 formData.append('image', imageInput.files[0]);
             }
 
-            // Expanded Cyberpunk properties
-            const dropRadius = document.getElementById('post-drop-radius')?.value;
-            if (dropRadius) {
-                formData.append('drop_radius', dropRadius);
-            }
-            
-            const isEmergency = document.getElementById('post-emergency')?.checked;
-            formData.append('is_emergency', isEmergency ? 'true' : 'false');
-            
-            const pollBuilderPanel = document.getElementById('poll-builder-panel');
-            const pollQuestion = document.getElementById('poll-builder-question')?.value;
-            if (pollBuilderPanel && !pollBuilderPanel.classList.contains('hidden') && pollQuestion && pollQuestion.trim()) {
-                formData.append('has_poll', 'true');
-                formData.append('poll_question', pollQuestion.trim());
-            }
-
             try {
                 const res = await fetch(`${API_URL}/posts`, {
                     method: 'POST',
@@ -1112,26 +467,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('post-text').value = '';
                     if (imageInput) imageInput.value = '';
                     if (imageName) imageName.textContent = '';
-                    
-                    // Reset fields
-                    if (document.getElementById('post-drop-radius')) {
-                        document.getElementById('post-drop-radius').value = '';
-                    }
-                    if (document.getElementById('post-emergency')) {
-                        document.getElementById('post-emergency').checked = false;
-                    }
-                    if (document.getElementById('poll-builder-question')) {
-                        document.getElementById('poll-builder-question').value = '';
-                    }
-                    if (pollBuilderPanel) {
-                        pollBuilderPanel.classList.add('hidden');
-                    }
-
-                    if (isEmergency) {
-                        triggerGlitchEffect();
-                    }
-
-                    if (window.soundEffects) window.soundEffects.playTransmit();
                     loadFeed();
                     updateMapVisuals();
                 }
@@ -1220,9 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 polygon.dataset.statsWith = stat.withPower;
                 polygon.dataset.statsNo = stat.noPower;
             });
-            if (typeof updateHUD === 'function') {
-                updateHUD(currentFilterMunicipality);
-            }
+
         } catch (err) {
             console.error(err);
         }
@@ -1231,99 +564,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Map setup on DOM
     const mapPolygons = document.querySelectorAll('#vector-map polygon');
     if (mapPolygons.length > 0) {
-        // --- Helper to update HUD details ---
-        function updateHUD(mName) {
-            const btnHudAction = document.getElementById('btn-hud-action');
-            const lockStatus = document.getElementById('hud-lock-status');
-            const hudCoords = document.getElementById('hud-coordinates');
-            const hudBandwidth = document.getElementById('hud-telemetry-bandwidth');
-
-            if (!mName) {
-                if (lockStatus) {
-                    lockStatus.textContent = "STANDBY";
-                    lockStatus.className = "font-bold text-outline";
-                }
-                if (hudCoords) hudCoords.textContent = "--.----° N, --.----° W";
-                if (hudBandwidth) hudBandwidth.textContent = "0.00 MHz";
-                if (btnHudAction) {
-                    btnHudAction.classList.add('hidden');
-                }
-                return;
-            }
-
-            const poly = document.querySelector(`#vector-map polygon[data-municipality="${mName}"]`);
-            const withP = poly ? parseInt(poly.dataset.statsWith || 0) : 0;
-            const noP = poly ? parseInt(poly.dataset.statsNo || 0) : 0;
-            const metadata = MUNICIPALITY_METADATA[mName] || { coords: "--.----° N, --.----° W", bandwidth: "0.00 MHz" };
-
-            if (lockStatus) {
-                lockStatus.textContent = `LOCKED: ${mName.toUpperCase()}`;
-                lockStatus.className = noP >= withP && noP > 0 ? "font-bold text-error animate-pulse" : "font-bold text-primary";
-            }
-            if (hudCoords) hudCoords.textContent = metadata.coords;
-            if (hudBandwidth) hudBandwidth.textContent = metadata.bandwidth;
-
-            if (btnHudAction) {
-                btnHudAction.classList.remove('hidden');
-                btnHudAction.dataset.targetMunicipality = mName;
-                if (user && user.location && user.location.toLowerCase() === mName.toLowerCase()) {
-                    btnHudAction.textContent = `CONEXIÓN ACTIVA EN ${mName.toUpperCase()}`;
-                    btnHudAction.disabled = true;
-                    btnHudAction.classList.remove('bg-primary/20', 'text-primary', 'hover:bg-primary/30', 'border-primary/40');
-                    btnHudAction.classList.add('bg-outline-variant/20', 'text-outline', 'border-outline-variant/40');
-                    btnHudAction.style.cursor = 'default';
-                } else {
-                    btnHudAction.textContent = `SINTONIZAR NODO: ${mName.toUpperCase()}`;
-                    btnHudAction.disabled = false;
-                    btnHudAction.classList.add('bg-primary/20', 'text-primary', 'hover:bg-primary/30', 'border-primary/40');
-                    btnHudAction.classList.remove('bg-outline-variant/20', 'text-outline', 'border-outline-variant/40');
-                    btnHudAction.style.cursor = 'pointer';
-                }
-            }
-        }
-
-        // Listener for the HUD tuning button
-        const btnHudAction = document.getElementById('btn-hud-action');
-        if (btnHudAction) {
-            btnHudAction.addEventListener('click', async () => {
-                const targetM = btnHudAction.dataset.targetMunicipality;
-                if (!targetM || !user) return;
-                
-                try {
-                    const formData = new FormData();
-                    formData.append('name', user.name);
-                    formData.append('location', targetM);
-                    
-                    const res = await fetch(`${API_URL}/users/${user.id}/update`, {
-                        method: 'POST',
-                        body: formData
-                    });
-                    const data = res.ok ? await res.json() : null;
-                    if (data && data.success) {
-                        user.location = data.location;
-                        sessionStorage.setItem('currentUser', JSON.stringify(user));
-                        updateUserUI();
-                        
-                        if (window.soundEffects) {
-                            window.soundEffects.playTransmit();
-                        }
-                        
-                        triggerGlitchEffect();
-                        updateHUD(targetM);
-                        loadFeed();
-                        updateMapVisuals();
-                        
-                        const settingsLocationSelect = document.getElementById('settings-location');
-                        if (settingsLocationSelect) {
-                            settingsLocationSelect.value = targetM;
-                        }
-                    }
-                } catch (err) {
-                    console.error("Error updating location via HUD:", err);
-                }
-            });
-        }
-
         updateMapVisuals();
         
         let tooltip = document.querySelector('.map-tooltip');
@@ -1337,46 +577,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const municipality = polygon.getAttribute('data-municipality');
             
             polygon.addEventListener('mousemove', (e) => {
+                const withP = polygon.dataset.statsWith || 0;
+                const noP = polygon.dataset.statsNo || 0;
+                
                 tooltip.innerHTML = `
                     <h4 class="font-bold text-primary mb-1">${municipality.toUpperCase()}</h4>
-                    <div class="flex gap-2"><span class="text-primary">ESTABLE:</span> <span>${polygon.dataset.statsWith || 0} nodos</span></div>
-                    <div class="flex gap-2"><span class="text-error">CORTE:</span> <span>${polygon.dataset.statsNo || 0} nodos</span></div>
+                    <div class="flex gap-2"><span class="text-primary">ESTABLE:</span> <span>${withP} nodos</span></div>
+                    <div class="flex gap-2"><span class="text-error">CORTE:</span> <span>${noP} nodos</span></div>
                 `;
                 
                 tooltip.classList.remove('hidden');
                 tooltip.style.left = (e.clientX + 15) + 'px';
                 tooltip.style.top = (e.clientY + 15) + 'px';
-
-                // Target lock logic
-                const rect = polygon.getBoundingClientRect();
-                const mapContainer = polygon.closest('.relative');
-                if (mapContainer) {
-                    const containerRect = mapContainer.getBoundingClientRect();
-                    const x = rect.left - containerRect.left + rect.width / 2;
-                    const y = rect.top - containerRect.top + rect.height / 2;
-                    
-                    const reticle = document.getElementById('map-target-reticle');
-                    if (reticle) {
-                        reticle.style.display = 'block';
-                        reticle.style.left = `${x}px`;
-                        reticle.style.top = `${y}px`;
-                    }
-                }
-                
-                // Update HUD Panel
-                updateHUD(municipality);
             });
 
             polygon.addEventListener('mouseleave', () => {
                 tooltip.classList.add('hidden');
-                
-                const reticle = document.getElementById('map-target-reticle');
-                if (reticle) {
-                    reticle.style.display = 'none';
-                }
-                
-                // Reset HUD Panel or lock to active filter
-                updateHUD(currentFilterMunicipality);
             });
 
             // Clicking polygon filters feed by that municipality
@@ -1385,11 +601,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (currentFilterMunicipality === municipality) {
                     currentFilterMunicipality = null;
-                    updateHUD(null);
                 } else {
                     currentFilterMunicipality = municipality;
                     polygon.classList.add('stroke-primary', 'stroke-[1.5]');
-                    updateHUD(municipality);
                 }
                 loadFeed();
             });
@@ -1413,23 +627,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             users.forEach(u => {
                 if (u.id === user.id) return;
-                
-                let dist = 0;
-                if (realUserCoords && u.location && u.location !== 'Anónimo') {
-                    const targetMeta = MUNICIPALITY_METADATA[u.location];
-                    const targetPos = parseCoords(targetMeta?.coords);
-                    if (targetPos) {
-                        dist = getHaversineDistance(realUserCoords.lat, realUserCoords.lon, targetPos.lat, targetPos.lon);
-                    } else {
-                        dist = ((u.id * 7) % 49) + 1;
-                    }
-                } else {
-                    dist = ((u.id * 7) % 49) + 1;
-                }
-                
-                dist = Math.round(dist * 10) / 10;
-                
-                if (dist <= val) {
+                const fakeDistance = ((u.id * 7) % 49) + 1;
+                if (fakeDistance <= val) {
                     const li = document.createElement('li');
                     li.className = "flex justify-between items-center p-2 rounded bg-surface hover:bg-surface-variant/40 transition-colors border border-transparent hover:border-primary/30 cursor-pointer btn-radar-node";
                     li.dataset.id = u.id;
@@ -1438,7 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_5px_#00f2ff] pulse-breathe"></div>
                             <span class="font-status-code text-xs text-on-surface">${u.username}</span>
                         </div>
-                        <span class="font-label-caps text-[10px] text-outline">${dist} KM</span>
+                        <span class="font-label-caps text-[10px] text-outline">${fakeDistance} KM</span>
                     `;
                     radarContainer.appendChild(li);
                 }
@@ -1454,9 +653,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (radarSlider) {
-        radarSlider.addEventListener('input', () => {
-            updateRadar();
-        });
+        radarSlider.addEventListener('input', updateRadar);
         updateRadar();
     }
 
@@ -1473,13 +670,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCancelReply = document.getElementById('btn-cancel-reply');
 
     let currentOpenPostId = null;
-    let currentOpenPost = null;
 
     async function openThreadModal(postId) {
         if (!threadModal) return;
-        
-        const isNewOpen = lastOpenedPostId !== postId;
-        lastOpenedPostId = postId;
         currentOpenPostId = postId;
         
         try {
@@ -1487,47 +680,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const posts = await resPost.json();
             const p = posts.find(item => item.id == postId);
             if (!p) return;
-
-            currentOpenPost = p;
-
-            // Trigger EM glitch overlay & sound on network outage posts
-            if (!p.has_power) {
-                triggerGlitchEffect();
-            }
-
-            const leftCanvas = document.getElementById('thread-left-canvas');
-            const rightComments = document.getElementById('thread-right-comments');
-            const modalContainer = document.getElementById('thread-modal-container');
-
-            if (p.image) {
-                if (leftCanvas) leftCanvas.classList.remove('hidden');
-                if (rightComments) {
-                    rightComments.classList.remove('md:w-full');
-                    rightComments.classList.add('md:w-1/2');
-                }
-                if (modalContainer) {
-                    modalContainer.classList.remove('max-w-2xl');
-                    modalContainer.classList.add('max-w-7xl');
-                }
-                
-                const postImg = document.getElementById('thread-post-image');
-                const noImgPlaceholder = document.getElementById('thread-post-no-image-placeholder');
-                if (postImg && noImgPlaceholder) {
-                    postImg.src = p.image;
-                    postImg.classList.remove('hidden');
-                    noImgPlaceholder.classList.add('hidden');
-                }
-            } else {
-                if (leftCanvas) leftCanvas.classList.add('hidden');
-                if (rightComments) {
-                    rightComments.classList.remove('md:w-1/2');
-                    rightComments.classList.add('md:w-full');
-                }
-                if (modalContainer) {
-                    modalContainer.classList.remove('max-w-7xl');
-                    modalContainer.classList.add('max-w-2xl');
-                }
-            }
 
             document.getElementById('thread-post-location').textContent = `${p.location} - ${p.has_power ? 'Estable' : 'Corte'}`;
             const badge = document.getElementById('thread-post-badge');
@@ -1541,21 +693,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             document.getElementById('thread-post-time').textContent = new Date(p.created_at).toLocaleTimeString();
+            
+            const postImg = document.getElementById('thread-post-image');
+            const noImgPlaceholder = document.getElementById('thread-post-no-image-placeholder');
+            if (p.image) {
+                postImg.src = p.image;
+                postImg.classList.remove('hidden');
+                noImgPlaceholder.classList.add('hidden');
+            } else {
+                postImg.classList.add('hidden');
+                noImgPlaceholder.classList.remove('hidden');
+            }
 
             document.getElementById('thread-post-author-avatar').src = p.avatar;
             document.getElementById('thread-post-author-name').textContent = `@${p.username}`;
             document.getElementById('thread-post-author-username').textContent = `NODO: ${p.name.toUpperCase()}`;
-            
-            const contentEl = document.getElementById('thread-post-content');
-            if (contentEl) {
-                if (isNewOpen) {
-                    decryptText(contentEl, p.content);
-                } else {
-                    contentEl.textContent = p.content;
-                }
-            }
+            document.getElementById('thread-post-content').textContent = p.content;
 
-            await loadThreadComments(isNewOpen);
+            await loadThreadComments();
             clearReplyState();
 
             threadModal.classList.remove('hidden');
@@ -1566,7 +721,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function loadThreadComments(isNewOpen = false) {
+    async function loadThreadComments() {
         if (!currentOpenPostId || !threadCommentsList) return;
 
         try {
@@ -1576,47 +731,12 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('thread-comments-count').textContent = `${comments.length} NODOS ACTIVOS`;
             threadCommentsList.innerHTML = '';
 
-            let htmlContent = '';
-
-            // Renderizar la tarjeta Root Post al principio si el post no tiene imagen
-            if (currentOpenPost && !currentOpenPost.image) {
-                const borderClass = currentOpenPost.has_power ? 'border-primary/30 bg-primary/5' : 'border-error/30 bg-error/5';
-                const statusDotClass = currentOpenPost.has_power ? 'bg-primary shadow-[0_0_8px_#00f2ff]' : 'bg-error shadow-[0_0_8px_#ffb4ab] pulse-strobe';
-                
-                htmlContent += `
-                <div class="p-4 rounded border ${borderClass} mb-6 relative overflow-hidden">
-                    <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMWgyMHYyMEgxVjF6IiBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoNTgsIDczLCA3NSwgMC4xKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9zdmc+')] opacity-40 pointer-events-none"></div>
-                    <div class="flex items-center justify-between border-b border-outline-variant/30 pb-2 mb-3 relative z-10">
-                        <div class="flex items-center gap-3">
-                            <img src="${currentOpenPost.avatar}" class="w-8 h-8 rounded-full border border-primary object-cover">
-                            <div>
-                                <span class="font-status-code text-xs text-on-surface">@${currentOpenPost.username} <span class="text-[9px] text-outline font-normal">(${currentOpenPost.name})</span></span>
-                                <span class="block font-label-caps text-[9px] text-outline flex items-center gap-0.5 mt-0.5">
-                                    <span class="material-symbols-outlined text-[10px]">location_on</span> ${currentOpenPost.location.toUpperCase()}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2 bg-background/50 border border-outline-variant/30 px-2 py-0.5 rounded text-[9px] font-label-caps text-on-surface-variant">
-                            <span class="w-1.5 h-1.5 rounded-full ${statusDotClass}"></span>
-                            <span>${currentOpenPost.has_power ? 'ESTABLE' : 'CORTE'}</span>
-                        </div>
-                    </div>
-                    <p class="text-on-surface font-body-md text-sm relative z-10">${currentOpenPost.content}</p>
-                    <div class="text-[9px] text-outline font-label-caps mt-3 text-right relative z-10">${new Date(currentOpenPost.created_at).toLocaleString()}</div>
-                </div>
-                `;
-            }
-
             if (comments.length === 0) {
-                if (currentOpenPost && !currentOpenPost.image) {
-                    threadCommentsList.innerHTML = htmlContent;
-                } else {
-                    threadCommentsList.innerHTML = `
-                    <div class="text-center py-12 text-outline text-xs font-label-caps">
-                        <span class="material-symbols-outlined text-[24px] mb-1 animate-pulse">forum</span>
-                        <p>SIN HILOS DE SÍNTESIS EN EL MOMENTO</p>
-                    </div>`;
-                }
+                threadCommentsList.innerHTML = `
+                <div class="text-center py-12 text-outline text-xs font-label-caps">
+                    <span class="material-symbols-outlined text-[24px] mb-1 animate-pulse">forum</span>
+                    <p>SIN HILOS DE SÍNTESIS EN EL MOMENTO</p>
+                </div>`;
                 return;
             }
 
@@ -1629,20 +749,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
+            let htmlContent = '';
             roots.forEach(root => {
                 htmlContent += buildCommentTreeHTML(root, childrenMap, 0);
             });
 
             threadCommentsList.innerHTML = htmlContent;
-
-            if (isNewOpen) {
-                const commentTexts = document.querySelectorAll('.thread-group .text-on-surface-variant');
-                commentTexts.forEach((el, idx) => {
-                    if (idx < 5) {
-                        decryptText(el, el.textContent);
-                    }
-                });
-            }
 
             document.querySelectorAll('.btn-comment-reply').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -1742,7 +854,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (res.ok) {
                     clearReplyState();
-                    if (window.soundEffects) window.soundEffects.playComment();
                     await loadThreadComments();
                 }
             } catch (err) {
@@ -1790,10 +901,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         activeChatUser = targetUser;
                         chatTitle.textContent = `CHAT CON ${btn.dataset.name}`;
                         chatWindow.classList.remove('hidden');
-                        
-                        // Clear animated message IDs so they decrypt on open
-                        animatedMessageIds.clear();
-
                         loadMessages();
                         if (chatInterval) clearInterval(chatInterval);
                         chatInterval = setInterval(loadMessages, 2000);
@@ -1818,89 +925,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch(`${API_URL}/messages/${user.id}/${activeChatUser}`);
                 const msgs = await res.json();
                 chatMessages.innerHTML = '';
-                
                 msgs.forEach(m => {
                     const isMe = m.from_user_id === user.id;
-                    const isNew = !animatedMessageIds.has(m.id);
-                    animatedMessageIds.add(m.id);
-                    
                     const div = document.createElement('div');
                     div.className = `flex flex-col max-w-[80%] ${isMe ? 'self-end items-end' : 'self-start items-start'} mb-2`;
-                    
-                    let messageContentHTML = '';
-                    let dataAttrs = '';
-                    
-                    if (m.burn_time !== null) {
-                        const openedTime = m.opened_at ? new Date(m.opened_at.replace(' ', 'T') + 'Z').getTime() : Date.now();
-                        const elapsed = m.opened_at ? Math.floor((Date.now() - openedTime) / 1000) : 0;
-                        const totalBurnTime = m.burn_time === -1 ? 15 : m.burn_time;
-                        const timeLeft = totalBurnTime - elapsed;
-                        
-                        if (m.opened_at && timeLeft <= 0) {
-                            return; // Already expired, skip rendering
-                        }
-                        
-                        dataAttrs = `data-msg-id="${m.id}" data-burn-time="${m.burn_time}" data-opened-at="${m.opened_at || ''}"`;
-                        const isOpened = m.opened_at !== null;
-                        const label = m.burn_time === -1 ? 'LECTURA ÚNICA' : `AUTODESTRUCCIÓN EN <span class="burn-timer-val">${isOpened ? timeLeft : m.burn_time}</span>s`;
-                        
-                        messageContentHTML = `
-                            <div class="burn-note relative p-2.5 rounded-lg text-sm bg-error/15 border border-error/40 text-on-surface-variant flex flex-col gap-1" ${dataAttrs}>
-                                <span class="chat-message-text font-mono">${m.content}</span>
-                                <span class="burn-timer-label text-[9px] text-error font-status-code flex items-center gap-1 mt-1 font-bold">
-                                    <span class="material-symbols-outlined text-[10px] animate-pulse">local_fire_department</span>
-                                    ${isOpened ? `🔥 ${label}` : `🔥 CREADO (ESPERANDO LECTURA)`}
-                                </span>
-                            </div>
-                        `;
-                    } else {
-                        messageContentHTML = `
-                            <div class="chat-normal-text ${isMe ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface'} p-2 rounded-lg text-sm">
-                                ${m.content}
-                            </div>
-                        `;
-                    }
-                    
                     div.innerHTML = `
-                        ${messageContentHTML}
+                        <div class="${isMe ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface'} p-2 rounded-lg text-sm">
+                            ${m.content}
+                        </div>
                         <span class="text-[8px] text-outline mt-1">${new Date(m.created_at).toLocaleTimeString()}</span>
                     `;
                     chatMessages.appendChild(div);
-                    
-                    if (isNew) {
-                        const textNode = div.querySelector('.chat-message-text, .chat-normal-text');
-                        if (textNode) {
-                            decryptText(textNode, m.content);
-                        }
-                    }
                 });
-
-                // Consultar telemetría de escritura (typing indicator)
-                try {
-                    const typingRes = await fetch(`${API_URL}/chat/typing/${user.id}`);
-                    const typers = await typingRes.json();
-                    const isTyping = typers.includes(parseInt(activeChatUser));
-                    
-                    let indicator = document.getElementById('chat-typing-indicator');
-                    if (isTyping) {
-                        if (!indicator) {
-                            indicator = document.createElement('div');
-                            indicator.id = 'chat-typing-indicator';
-                            indicator.className = 'flex items-center gap-2 text-primary font-status-code text-[10px] p-2 mb-2 self-start bg-surface-variant/20 rounded border border-primary/20 animate-pulse shrink-0';
-                            indicator.innerHTML = `
-                                <span class="material-symbols-outlined text-xs">sensors</span>
-                                <span>TRANSMITIENDO SEÑAL</span>
-                                <div class="typing-dots flex items-center ml-1"><span></span><span></span><span></span></div>
-                            `;
-                            chatMessages.appendChild(indicator);
-                        }
-                    } else {
-                        if (indicator) {
-                            indicator.remove();
-                        }
-                    }
-                } catch(te) {}
-
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             } catch(e) { console.error(e); }
         }
@@ -1908,46 +944,17 @@ document.addEventListener('DOMContentLoaded', () => {
         btnSendMsg.addEventListener('click', async () => {
             const text = msgInput.value;
             if (!text.trim() || !activeChatUser) return;
-            
-            // Informar que terminamos de escribir inmediatamente
-            fetch(`${API_URL}/chat/typing`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: user.id, typing_to_id: activeChatUser, is_typing: false })
-            }).catch(() => {});
-
-            const burnTimeSelect = document.getElementById('chat-burn-time');
-            const burnTime = burnTimeSelect ? burnTimeSelect.value : '';
-
             await fetch(`${API_URL}/messages`, {
                 method: 'POST',
                 headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({
                     from_user_id: user.id,
                     to_user_id: activeChatUser,
-                    content: text,
-                    burn_time: burnTime ? parseInt(burnTime) : null
+                    content: text
                 })
             });
-            
-            if (window.soundEffects) window.soundEffects.playMessageSent();
             msgInput.value = '';
-            if (burnTimeSelect) burnTimeSelect.value = '';
             loadMessages();
-        });
-
-        // Enviar evento de escritura al teclear
-        let lastTypingSent = 0;
-        msgInput.addEventListener('input', () => {
-            const now = Date.now();
-            if (now - lastTypingSent > 2000 && activeChatUser) {
-                lastTypingSent = now;
-                fetch(`${API_URL}/chat/typing`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: user.id, typing_to_id: activeChatUser, is_typing: true })
-                }).catch(() => {});
-            }
         });
 
         loadNodes();
