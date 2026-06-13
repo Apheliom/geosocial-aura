@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html class="dark" lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>GeoSocial - Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=JetBrains+Mono:wght@400..800&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet"/>
+    <!-- Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="tailwind-config.js?v=4"></script>
+
+    <link rel="stylesheet" href="styles.css?v=3">
+    <script src="sound-effects.js?v=1" defer></script>
+    <script src="app.js?v=3" defer></script>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen relative overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- Global Scanline Overlay -->
+<div class="fixed inset-0 scanline z-50 mix-blend-overlay"></div>
+
+<!-- TopNavBar -->
+<nav class="bg-background/80 backdrop-blur-xl docked full-width top-0 border-b border-outline-variant shadow-[0_0_15px_rgba(0,219,231,0.3)] flex justify-between items-center w-full px-margin-desktop h-16 sticky z-40">
+    <div class="flex items-center gap-4 md:gap-8 overflow-hidden w-full md:w-auto">
+        <div class="font-display-lg text-headline-lg-mobile md:text-headline-lg tracking-tighter text-primary animate-pulse shrink-0">GEOSOCIAL</div>
+        <!-- Navigation Links -->
+        <div class="flex overflow-x-auto hide-scrollbar gap-4 md:gap-6 items-center h-full w-full">
+            <a class="text-on-surface-variant font-medium hover:text-primary-fixed-dim transition-colors duration-300 flex flex-col justify-center h-full text-sm md:text-base shrink-0" href="#column-map" id="nav-map">MAPA</a>
+            <a class="text-primary font-bold border-b-2 border-primary pb-1 flex flex-col justify-center h-full mt-1 text-sm md:text-base shrink-0" href="#column-feed" id="nav-feed">MURO</a>
+            <a class="text-on-surface-variant font-medium hover:text-primary-fixed-dim transition-colors duration-300 flex flex-col justify-center h-full text-sm md:text-base shrink-0" href="#column-radar" id="nav-radar">OPERACIONES</a>
+            <a class="text-on-surface-variant font-medium hover:text-primary-fixed-dim transition-colors duration-300 flex flex-col justify-center h-full text-sm md:text-base shrink-0" href="/nodes">NODOS</a>
+        </div>
+    </div>
+    <div class="flex items-center gap-4 text-primary relative">
+        <canvas id="audio-visualizer" class="w-16 h-6 mr-1 bg-transparent hidden md:block" width="64" height="24"></canvas>
+        <button id="btn-volume" class="hover:text-primary-fixed-dim transition-colors duration-300 relative" title="Silenciar Sonidos">
+            <span class="material-symbols-outlined volume-on">volume_up</span>
+            <span class="material-symbols-outlined volume-off">volume_off</span>
+        </button>
+        <button id="btn-ghost" class="hover:text-primary-fixed-dim transition-colors duration-300 relative flex items-center gap-1" title="Toggle Modo Fantasma">
+            <span class="material-symbols-outlined">visibility_off</span>
+            <span id="ghost-indicator" class="hidden ghost-active-indicator"></span>
+        </button>
+        <button id="btn-notifications" class="hover:text-primary-fixed-dim transition-colors duration-300 relative" title="Notificaciones">
+            <span class="material-symbols-outlined">notifications</span>
+            <div id="notif-badge" class="absolute top-0 right-0 w-2 h-2 bg-error rounded-full hidden shadow-[0_0_5px_red]"></div>
+        </button>
+        <div id="notif-dropdown" class="absolute top-10 right-16 w-64 bg-surface-container-high border border-outline-variant rounded shadow-lg hidden flex-col overflow-hidden z-50">
+            <div class="p-2 border-b border-outline-variant text-xs font-label-caps text-outline">NOTIFICACIONES</div>
+            <ul id="notif-list" class="max-h-60 overflow-y-auto flex flex-col text-sm text-on-surface">
+                <li class="p-2 text-center text-outline text-xs">Sin notificaciones</li>
+            </ul>
+        </div>
+
+        <button id="btn-settings" class="hover:text-primary-fixed-dim transition-colors duration-300" title="Ajustes">
+            <span class="material-symbols-outlined">settings</span>
+        </button>
+        <button id="btn-logout" class="hover:text-error transition-colors duration-300" title="Cerrar Sesión">
+            <span class="material-symbols-outlined">logout</span>
+        </button>
+        <span class="current-user-name font-status-code text-sm hidden md:inline"></span>
+        <div class="w-8 h-8 rounded-full bg-surface-variant overflow-hidden border border-outline-variant cursor-pointer" id="btn-avatar-settings">
+            <img alt="User Avatar" class="current-user-avatar w-full h-full object-cover" src=""/>
+        </div>
+    </div>
+</nav>
+
+<!-- Main Grid Container -->
+<main class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-8 grid grid-cols-1 md:grid-cols-12 gap-gutter relative z-10">
+    
+    <!-- COLUMN 1: LEFT (25%) - MAP -->
+    <aside id="column-map" class="md:col-span-3 flex flex-col gap-6">
+        <div class="bg-surface-container-low/90 backdrop-blur-md rounded-lg border border-outline-variant p-4 shadow-[0_0_10px_rgba(0,0,0,0.5)]">
+            <h2 class="font-label-caps text-label-caps text-primary mb-4 pb-2 border-b border-outline-variant tracking-widest">LARA MONITOR - VECTOR MAP</h2>
+            <!-- SVG Map Abstraction -->
+            <div class="relative w-full aspect-square bg-surface-dim rounded border border-outline-variant overflow-hidden flex items-center justify-center p-2 mb-4 group cursor-crosshair">
+                <!-- Grid background -->
+                <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMWgyMHYyMEgxVjF6IiBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoNTgsIDczLCA3NSwgMC4yKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9zdmc+')] opacity-50"></div>
+                <svg id="vector-map" class="w-full h-full relative z-10 drop-shadow-[0_0_5px_currentColor]" viewbox="0 0 100 100">
+                    <!-- Abstract Polygons representing municipalities -->
+                    <!-- Torres -->
+                    <polygon data-municipality="Torres" class="fill-surface-variant/40 stroke-surface-variant stroke-[0.5] hover:fill-surface-variant/60 transition-all cursor-pointer" points="5,20 30,10 40,40 10,60"></polygon>
+                    <!-- Urdaneta -->
+                    <polygon data-municipality="Urdaneta" class="fill-surface-variant/40 stroke-surface-variant stroke-[0.5] hover:fill-surface-variant/60 transition-all cursor-pointer" points="30,10 60,5 70,30 40,40"></polygon>
+                    <!-- Crespo -->
+                    <polygon data-municipality="Crespo" class="fill-surface-variant/40 stroke-surface-variant stroke-[0.5] hover:fill-surface-variant/60 transition-all cursor-pointer" points="60,5 90,15 85,35 70,30"></polygon>
+                    <!-- Iribarren -->
+                    <polygon data-municipality="Iribarren" class="fill-surface-variant/40 stroke-surface-variant stroke-[0.5] hover:fill-surface-variant/60 transition-all cursor-pointer" points="40,40 70,30 80,50 50,65"></polygon>
+                    <!-- Palavecino -->
+                    <polygon data-municipality="Palavecino" class="fill-surface-variant/40 stroke-surface-variant stroke-[0.5] hover:fill-surface-variant/60 transition-all cursor-pointer" points="70,30 85,35 95,55 80,50"></polygon>
+                    <!-- Jiménez -->
+                    <polygon data-municipality="Jiménez" class="fill-surface-variant/40 stroke-surface-variant stroke-[0.5] hover:fill-surface-variant/60 transition-all cursor-pointer" points="10,60 40,40 50,65 20,80"></polygon>
+                    <!-- Morán -->
+                    <polygon data-municipality="Morán" class="fill-surface-variant/40 stroke-surface-variant stroke-[0.5] hover:fill-surface-variant/60 transition-all cursor-pointer" points="5,60 20,80 30,95 5,85"></polygon>
+                    <!-- Andrés Eloy Blanco -->
+                    <polygon data-municipality="Andrés Eloy Blanco" class="fill-surface-variant/40 stroke-surface-variant stroke-[0.5] hover:fill-surface-variant/60 transition-all cursor-pointer" points="20,80 50,65 60,85 30,95"></polygon>
+                    <!-- Simón Planas -->
+                    <polygon data-municipality="Simón Planas" class="fill-surface-variant/40 stroke-surface-variant stroke-[0.5] hover:fill-surface-variant/60 transition-all cursor-pointer" points="50,65 80,50 90,75 60,85"></polygon>
+                </svg>
+                <div id="map-target-reticle" class="targeting-reticle"></div>
+            </div>
+            <!-- HUD Telemetry panel -->
+            <div class="hud-panel mb-4 flex flex-col gap-1 select-none">
+                <div class="flex justify-between"><span class="text-outline">SCANNER LOCK:</span> <span id="hud-lock-status" class="font-bold">STANDBY</span></div>
+                <div class="flex justify-between"><span class="text-outline">COORDINATES:</span> <span id="hud-coordinates" class="font-status-code">--.----° N, --.----° W</span></div>
+                <div class="flex justify-between"><span class="text-outline">TELEMETRY:</span> <span id="hud-telemetry-bandwidth" class="font-status-code">0.00 MHz</span></div>
+                <button id="btn-hud-action" class="mt-2 w-full py-1 bg-primary/20 text-primary border border-primary/40 text-[9px] font-label-caps rounded hover:bg-primary/30 transition-all hidden">SINTONIZAR UBICACIÓN DE NODO</button>
+            </div>
+            <!-- Legend -->
+            <div class="flex flex-col gap-2 font-label-caps text-[10px]">
+                <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-error pulse-strobe shadow-[0_0_5px_#ffb4ab]"></div> <span class="text-on-surface-variant">CORTE CRÍTICO (ROJO)</span></div>
+                <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-primary shadow-[0_0_5px_#00f2ff]"></div> <span class="text-on-surface-variant">ESTABLE (CYAN)</span></div>
+                <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-surface-variant"></div> <span class="text-on-surface-variant">SIN DATOS (OSCURO)</span></div>
+            </div>
+        </div>
+    </aside>
+    
+    <!-- COLUMN 2: CENTER (50%) - FEED -->
+    <section id="column-feed" class="md:col-span-6 flex flex-col gap-6">
+        <!-- Stories: Nodes in Range -->
+        <div id="stories-container" class="w-full flex overflow-x-auto hide-scrollbar gap-4 py-2 border-y border-outline-variant/30 bg-surface-container-low/30 backdrop-blur-sm">
+            <!-- Loaded dynamically by JS -->
+        </div>
+
+        <!-- Post Creation Box -->
+        <div class="bg-surface-container-low/90 backdrop-blur-md rounded-lg border border-outline-variant p-4 focus-within:border-primary focus-within:shadow-[0_0_15px_rgba(0,219,231,0.1)] transition-all">
+            <div class="flex gap-3">
+                <div class="w-10 h-10 rounded-full bg-surface-variant overflow-hidden shrink-0 border border-outline-variant">
+                    <img alt="Current User" class="current-user-avatar w-full h-full object-cover" src=""/>
+                </div>
+                <textarea id="post-text" class="w-full bg-transparent border-none text-on-surface focus:ring-0 resize-none font-body-md placeholder:text-outline h-10 focus:h-20 transition-all outline-none" placeholder="¿Cuál es la situación en tu sector?"></textarea>
+            </div>
+            <div class="flex flex-col gap-3 mt-4 pt-3 border-t border-outline-variant/50">
+                <div class="flex justify-between items-center flex-wrap gap-2">
+                    <div class="flex gap-2 items-center">
+                        <label class="text-outline hover:text-primary transition-colors p-1 cursor-pointer" title="Subir Imagen">
+                            <span class="material-symbols-outlined text-[20px]">image</span>
+                            <input type="file" id="post-image" class="hidden" accept="image/*">
+                        </label>
+                        <span id="post-image-name" class="text-[10px] text-outline truncate max-w-[80px]"></span>
+                        
+                        <!-- Telemetry Poll Builder Toggle -->
+                        <button id="btn-toggle-poll-builder" class="text-outline hover:text-primary transition-colors p-1" title="Añadir Encuesta de Telemetría">
+                            <span class="material-symbols-outlined text-[20px]">poll</span>
+                        </button>
+
+                        <!-- Data Drop Select -->
+                        <select id="post-drop-radius" class="bg-surface-dim border border-outline-variant/50 text-outline text-[9px] font-label-caps rounded px-1.5 py-0.5 outline-none focus:border-primary">
+                            <option value="">DROP: GLOBAL</option>
+                            <option value="15">DROP: 15 KM</option>
+                            <option value="30">DROP: 30 KM</option>
+                            <option value="50">DROP: 50 KM</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-3 items-center flex-wrap">
+                        <!-- Red Emergency Broadcast Toggle -->
+                        <label class="flex items-center gap-1.5 cursor-pointer" title="Difusión de Sirena de Emergencia en Tiempo Real">
+                            <input id="post-emergency" class="sr-only peer" type="checkbox"/>
+                            <div class="w-8 h-4 bg-surface-variant rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-error relative"></div>
+                            <span class="font-label-caps text-[9px] text-on-surface-variant peer-checked:text-error transition-colors">DIFUSIÓN SIRENA</span>
+                        </label>
+                        
+                        <!-- Red state toggle -->
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input id="post-pwr" class="sr-only peer" type="checkbox" checked/>
+                            <div class="w-8 h-4 bg-error rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary relative"></div>
+                            <span class="font-label-caps text-[9px] text-on-surface-variant peer-checked:text-primary transition-colors">ESTADO RED</span>
+                        </label>
+                        <!-- Time Capsule toggle -->
+                        <label class="flex items-center gap-1.5 cursor-pointer" title="Cápsula del Tiempo: Cifrada por coordenadas (100m)">
+                            <input id="post-time-capsule" class="sr-only peer" type="checkbox"/>
+                            <div class="w-8 h-4 bg-surface-variant rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-secondary relative"></div>
+                            <span class="font-label-caps text-[9px] text-on-surface-variant peer-checked:text-secondary transition-colors">CÁPSULA GPS</span>
+                        </label>
+                        <button id="btn-transmit" class="bg-primary text-on-primary font-status-code px-4 py-1.5 rounded hover:shadow-[0_0_15px_rgba(0,219,231,0.5)] transition-all text-xs">TRANSMITIR</button>
+                    </div>
+                </div>
+                <!-- Poll builder panel -->
+                <div id="poll-builder-panel" class="hidden p-2 border border-outline-variant/30 rounded bg-surface-dim/50 flex flex-col gap-1.5">
+                    <label class="font-label-caps text-[8px] text-outline">PREGUNTA DE ENCUESTA (SÍ / NO)</label>
+                    <input type="text" id="poll-builder-question" class="w-full bg-surface-variant text-on-surface text-xs rounded px-2 py-1 outline-none border border-transparent focus:border-primary" placeholder="Ej: ¿Tienes servicio de agua estable en tu calle?">
+                </div>
+            </div>
+        </div>
+
+        <!-- THE FEED -->
+        <div id="feed-container" class="flex flex-col gap-6">
+            <!-- Dynamically populated by JS -->
+        </div>
+    </section>
+    
+    <!-- COLUMN 3: RIGHT (25%) - OPERACIONES RPG & MEETUPS -->
+    <aside id="column-radar" class="md:col-span-3 flex flex-col gap-6">
+        <!-- Dashboard Container -->
+        <div class="bg-surface-container-low/90 backdrop-blur-md rounded-lg border border-outline-variant p-4 flex flex-col gap-5 sticky top-20 max-h-[88vh] overflow-y-auto hide-scrollbar shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+            
+            <!-- Header -->
+            <div class="border-b border-outline-variant pb-2 flex items-center justify-between">
+                <h2 class="font-label-caps text-label-caps text-primary tracking-widest flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[16px] animate-pulse">terminal</span> OPERACIONES NET
+                </h2>
+                <div class="flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>
+                    <span id="gps-status-badge" class="font-status-code text-[8px] text-primary">GPS: SYNCED</span>
+                </div>
+            </div>
+
+            <!-- 1. Medallas (HUD Badges) -->
+            <div>
+                <h3 class="font-label-caps text-[9px] text-outline mb-2 tracking-wider">MEDALLAS DE LA RED</h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <!-- Medalla 1: Explorador -->
+                    <div id="badge-explorer" class="flex flex-col items-center p-2 rounded bg-surface-dim border border-outline-variant/30 opacity-40 transition-all select-none hover:border-primary/40 group cursor-help" title="Explorador Neón: Realiza check-in en 3 zonas de Lara.">
+                        <span class="material-symbols-outlined text-[20px] text-primary group-hover:scale-110 transition-transform">explore</span>
+                        <span class="font-label-caps text-[7px] text-center mt-1 truncate w-full text-on-surface">EXPLORADOR</span>
+                    </div>
+                    <!-- Medalla 2: Hacker Temporal -->
+                    <div id="badge-hacker" class="flex flex-col items-center p-2 rounded bg-surface-dim border border-outline-variant/30 opacity-40 transition-all select-none hover:border-secondary/40 group cursor-help" title="Hacker Temporal: Desbloquea 1 Cápsula del Tiempo GPS.">
+                        <span class="material-symbols-outlined text-[20px] text-secondary group-hover:scale-110 transition-transform">terminal</span>
+                        <span class="font-label-caps text-[7px] text-center mt-1 truncate w-full text-on-surface">HACKER</span>
+                    </div>
+                    <!-- Medalla 3: Operador Net -->
+                    <div id="badge-operator" class="flex flex-col items-center p-2 rounded bg-surface-dim border border-outline-variant/30 opacity-40 transition-all select-none hover:border-error/40 group cursor-help" title="Operador Net: Completa todas las misiones semanales.">
+                        <span class="material-symbols-outlined text-[20px] text-error group-hover:scale-110 transition-transform">hub</span>
+                        <span class="font-label-caps text-[7px] text-center mt-1 truncate w-full text-on-surface">OPERADOR</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Misiones Semanales (Progress bars) -->
+            <div class="border-t border-outline-variant/30 pt-3">
+                <h3 class="font-label-caps text-[9px] text-outline mb-2 tracking-wider">MISIONES SEMANALES</h3>
+                <div class="flex flex-col gap-2.5" id="rpg-missions-list">
+                    <!-- Misión 1: Explorador -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between items-center text-[9px]">
+                            <span class="text-on-surface truncate pr-1">Explorador de Lara</span>
+                            <span id="mission-1-val" class="font-status-code text-primary">0/2</span>
+                        </div>
+                        <div class="w-full bg-surface-dim h-1.5 rounded overflow-hidden border border-outline-variant/30">
+                            <div id="mission-1-progress" class="bg-primary h-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <!-- Misión 2: Hacker -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between items-center text-[9px]">
+                            <span class="text-on-surface truncate pr-1">Hacker Temporal</span>
+                            <span id="mission-2-val" class="font-status-code text-secondary">0/1</span>
+                        </div>
+                        <div class="w-full bg-surface-dim h-1.5 rounded overflow-hidden border border-outline-variant/30">
+                            <div id="mission-2-progress" class="bg-secondary h-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <!-- Misión 3: Conector -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between items-center text-[9px]">
+                            <span class="text-on-surface truncate pr-1">Conector Urbano</span>
+                            <span id="mission-3-val" class="font-status-code text-error">0/1</span>
+                        </div>
+                        <div class="w-full bg-surface-dim h-1.5 rounded overflow-hidden border border-outline-variant/30">
+                            <div id="mission-3-progress" class="bg-error h-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Zonas de Conquista (Check-ins & Stories) -->
+            <div class="border-t border-outline-variant/30 pt-3">
+                <h3 class="font-label-caps text-[9px] text-outline mb-2 tracking-wider">ZONAS DE CONQUISTA</h3>
+                <div class="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1 hide-scrollbar" id="rpg-zones-list">
+                    <!-- Populated dynamically by JS -->
+                    <div class="p-2 text-center text-xs text-outline">Cargando hotspots...</div>
+                </div>
+            </div>
+
+            <!-- 4. Radares de Actividad (Meetups) -->
+            <div class="border-t border-outline-variant/30 pt-3 flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-label-caps text-[9px] text-outline tracking-wider">RADARES DE ACTIVIDAD</h3>
+                    <button id="btn-create-meetup" class="px-2 py-0.5 bg-primary/20 text-primary border border-primary/40 text-[8px] font-label-caps rounded hover:bg-primary/30 transition-all flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[10px]">add_circle</span> INICIAR PIN
+                    </button>
+                </div>
+                <div class="flex flex-col gap-2 max-h-[160px] overflow-y-auto pr-1 hide-scrollbar" id="meetups-active-list">
+                    <!-- Populated dynamically by JS -->
+                    <div class="p-2 text-center text-[10px] text-outline bg-surface-dim/40 rounded border border-outline-variant/20 italic">No hay radares activos ahora mismo.</div>
+                </div>
+            </div>
+
+            <!-- 5. Nodos Activos Cercanos -->
+            <div class="border-t border-outline-variant/30 pt-3">
+                <h3 class="font-label-caps text-[9px] text-outline mb-2 tracking-wider">NODOS CERCANOS</h3>
+                <ul id="radar-users" class="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto pr-1 hide-scrollbar">
+                    <!-- Populated dynamically by JS -->
+                </ul>
+            </div>
+
+            <!-- 6. Simulador GPS (Herramientas de Prueba) -->
+            <div class="border-t border-outline-variant/30 pt-3 flex flex-col gap-1.5">
+                <button id="btn-toggle-tester" class="w-full py-1 bg-outline-variant/20 text-outline-variant border border-outline-variant/30 text-[8px] font-label-caps rounded hover:bg-outline-variant/30 transition-all flex items-center justify-between px-2">
+                    <span>[HERRAMIENTAS DE PRUEBA / GPS]</span>
+                    <span class="material-symbols-outlined text-[12px]" id="tester-toggle-icon">expand_more</span>
+                </button>
+                <div id="tester-panel" class="hidden flex flex-col gap-2 p-2 rounded bg-surface-dim/70 border border-outline-variant/35 text-[9px]">
+                    <p class="text-outline italic">Usa estos botones para teletransportar tu GPS y probar la lógica de proximidad de check-ins, cápsulas e historias en Barquisimeto y Lara.</p>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <button class="btn-simulate-gps px-1.5 py-1 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 rounded transition-all text-left truncate" data-zone="obelisco" title="Teletransporte al Obelisco (Iribarren)">Obelisco</button>
+                        <button class="btn-simulate-gps px-1.5 py-1 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 rounded transition-all text-left truncate" data-zone="flor_venezuela" title="Teletransporte a la Flor (Iribarren)">Flor Vzla</button>
+                        <button class="btn-simulate-gps px-1.5 py-1 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 rounded transition-all text-left truncate" data-zone="manto_maria" title="Teletransporte al Manto (Iribarren)">Manto María</button>
+                        <button class="btn-simulate-gps px-1.5 py-1 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 rounded transition-all text-left truncate" data-zone="unefa_lara" title="Teletransporte a la UNEFA Calle 25 (Sede Especial)">Sede UNEFA</button>
+                        <button class="btn-simulate-gps px-1.5 py-1 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 rounded transition-all text-left truncate" data-zone="plaza_cabudare" title="Teletransporte a Cabudare (Palavecino)">Plaza Cabudare</button>
+                        <button class="btn-simulate-gps px-1.5 py-1 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 rounded transition-all text-left truncate" data-zone="tintorero" title="Teletransporte a Tintorero (Jiménez)">Tintorero</button>
+                        <button class="btn-simulate-gps px-1.5 py-1 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 rounded transition-all text-left truncate" data-zone="cubiro" title="Teletransporte a Cubiro (Jiménez)">Cubiro</button>
+                        <button class="btn-simulate-gps px-1.5 py-1 bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 rounded transition-all text-left truncate" data-zone="carora" title="Teletransporte a Carora (Torres)">Carora</button>
+                    </div>
+                    <button id="btn-reset-gps" class="w-full py-1 bg-error/10 text-error border border-error/30 hover:bg-error/20 rounded transition-all text-center font-label-caps text-[8px] mt-1">RESTAURAR GPS REAL</button>
+                </div>
+            </div>
+
+        </div>
+    </aside>
+</main>
+
+<!-- Modal Ajustes -->
+<div id="settings-modal" class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+    <div class="bg-surface-container-high p-6 rounded-lg border border-primary/50 shadow-[0_0_30px_rgba(0,219,231,0.2)] w-full max-w-sm relative z-55">
+        <h3 class="font-status-code text-primary mb-4 flex items-center gap-2"><span class="material-symbols-outlined">settings</span> AJUSTES DE NODO</h3>
+        <form id="form-settings" class="flex flex-col gap-4">
+            <div class="flex items-center gap-4 mb-2">
+                <div class="w-16 h-16 rounded-full overflow-hidden border border-primary bg-surface-dim">
+                    <img id="settings-avatar-preview" src="" class="w-full h-full object-cover">
+                </div>
+                <label class="cursor-pointer bg-surface-variant px-3 py-1 rounded text-xs hover:bg-primary hover:text-on-primary transition-colors text-center">
+                    Cambiar Foto
+                    <input type="file" id="settings-avatar-input" class="hidden" accept="image/*">
+                </label>
+            </div>
+            <div>
+                <label class="font-label-caps text-[10px] text-outline block mb-1">NOMBRE PÚBLICO</label>
+                <input type="text" id="settings-name" class="w-full bg-surface-dim border border-outline-variant text-on-surface text-sm rounded px-3 py-2 outline-none focus:border-primary">
+            </div>
+            <div>
+                <label class="font-label-caps text-[10px] text-outline block mb-1">SECTOR (MUNICIPIO)</label>
+                <select id="settings-location" class="w-full bg-surface-dim border border-outline-variant text-on-surface font-label-caps text-xs rounded px-3 py-2 outline-none focus:border-primary">
+                    <option value="Iribarren">IRIBARREN</option>
+                    <option value="Palavecino">PALAVECINO</option>
+                    <option value="Torres">TORRES</option>
+                    <option value="Urdaneta">URDANETA</option>
+                    <option value="Crespo">CRESPO</option>
+                    <option value="Jiménez">JIMÉNEZ</option>
+                    <option value="Morán">MORÁN</option>
+                    <option value="Andrés Eloy Blanco">ANDRÉS ELOY BLANCO</option>
+                    <option value="Simón Planas">SIMÓN PLANAS</option>
+                </select>
+            </div>
+            <div>
+                <label class="font-label-caps text-[10px] text-outline block mb-1">MIS INTERESES (MEETUPS)</label>
+                <div id="settings-interests-pills" class="flex flex-wrap gap-1.5 py-1">
+                    <button type="button" class="interest-pill px-2 py-0.5 rounded bg-surface border border-outline-variant text-[8px] font-label-caps hover:border-primary hover:text-primary transition-all cursor-pointer" data-interest="Fútbol">Fútbol</button>
+                    <button type="button" class="interest-pill px-2 py-0.5 rounded bg-surface border border-outline-variant text-[8px] font-label-caps hover:border-primary hover:text-primary transition-all cursor-pointer" data-interest="Café">Café</button>
+                    <button type="button" class="interest-pill px-2 py-0.5 rounded bg-surface border border-outline-variant text-[8px] font-label-caps hover:border-primary hover:text-primary transition-all cursor-pointer" data-interest="Juegos de mesa">Juegos de Mesa</button>
+                    <button type="button" class="interest-pill px-2 py-0.5 rounded bg-surface border border-outline-variant text-[8px] font-label-caps hover:border-primary hover:text-primary transition-all cursor-pointer" data-interest="Música">Música</button>
+                    <button type="button" class="interest-pill px-2 py-0.5 rounded bg-surface border border-outline-variant text-[8px] font-label-caps hover:border-primary hover:text-primary transition-all cursor-pointer" data-interest="Charlar">Charlar</button>
+                    <button type="button" class="interest-pill px-2 py-0.5 rounded bg-surface border border-outline-variant text-[8px] font-label-caps hover:border-primary hover:text-primary transition-all cursor-pointer" data-interest="Cine">Cine</button>
+                </div>
+                <input type="hidden" id="settings-interests-input" value="">
+            </div>
+            <div class="flex justify-end gap-2 mt-4">
+                <button type="button" id="close-settings-modal" class="px-4 py-2 text-outline hover:text-on-surface text-sm">Cerrar</button>
+                <button type="submit" class="px-4 py-2 bg-primary text-on-primary rounded text-sm hover:shadow-[0_0_10px_rgba(0,219,231,0.5)]">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Compartir (Retransmitir) -->
+<div id="share-modal" class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+    <div class="bg-surface-container-high p-6 rounded-lg border border-primary/50 shadow-[0_0_30px_rgba(0,219,231,0.2)] w-full max-w-md relative z-55">
+        <h3 class="font-status-code text-primary mb-4">RETRANSMITIR REPORTE</h3>
+        <div id="share-original-content" class="text-sm text-outline italic mb-4 p-2 bg-surface-dim rounded border border-outline-variant/30"></div>
+        <input type="hidden" id="share-post-id">
+        <textarea id="share-text" class="w-full bg-surface-dim border border-outline-variant text-on-surface rounded p-2 text-sm outline-none focus:border-primary resize-none h-20 mb-4" placeholder="Añade tu comentario al compartir..."></textarea>
+        <div class="flex justify-end gap-2">
+            <button id="close-share-modal" class="px-4 py-2 text-outline hover:text-on-surface text-sm">Cancelar</button>
+            <button id="btn-confirm-share" class="px-4 py-2 bg-primary text-on-primary rounded text-sm hover:shadow-[0_0_10px_rgba(0,219,231,0.5)]">Compartir</button>
+        </div>
+    </div>
+</div>
+
+<!-- Threads & Synthesis Modal (Detail view) -->
+<div id="thread-modal" class="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 md:p-8">
+    <main id="thread-modal-container" class="cyber-glass w-full max-w-7xl rounded-xl overflow-hidden flex flex-col md:flex-row shadow-[0_10px_40px_rgba(0,0,0,0.8)] border-outline-variant h-[90vh] md:h-[80vh] relative z-10">
+        <!-- Close Button -->
+        <button id="close-thread-modal" class="absolute top-4 right-4 z-50 text-outline hover:text-primary transition-colors p-2 rounded-full hover:bg-surface-variant/50 group">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+        
+        <!-- Left Side: Original Post Canvas -->
+        <section id="thread-left-canvas" class="w-full md:w-1/2 flex flex-col border-b md:border-b-0 md:border-r border-outline-variant/30 bg-surface-container-lowest/40 h-1/2 md:h-full overflow-hidden relative group">
+            <!-- Municipal Badge / Header -->
+            <div class="absolute top-0 left-0 w-full p-4 z-20 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between">
+                <div id="thread-post-badge" class="flex items-center gap-2 bg-error-container/20 border border-error/30 px-3 py-1.5 rounded-sm backdrop-blur-md">
+                    <span id="thread-post-badge-dot" class="w-2 h-2 rounded-full bg-error status-strobe shadow-[0_0_8px_rgba(255,180,171,0.8)]"></span>
+                    <span id="thread-post-location" class="font-label-caps text-label-caps text-error">Iribarren - Outage</span>
+                </div>
+                <div id="thread-post-time" class="font-status-code text-status-code text-outline-variant">T-00:00:00</div>
+            </div>
+            <!-- Image Area -->
+            <div class="relative w-full flex-grow flex-1 overflow-hidden bg-black flex items-center justify-center min-h-0">
+                <div id="thread-post-no-image-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-outline-variant bg-surface-dim/40 p-4 text-center">
+                    <span class="material-symbols-outlined text-[48px] animate-pulse mb-2">signal_cellular-no_sim</span>
+                    <span class="font-label-caps text-xs">SIN IMAGEN DE RESPALDO DISPONIBLE</span>
+                </div>
+                <img id="thread-post-image" alt="Post image" class="max-w-full max-h-full h-auto w-auto object-contain transition-all duration-300 hidden" src=""/>
+            </div>
+            <!-- Post Content -->
+            <div class="relative w-full p-6 z-20 bg-surface-container-lowest border-t border-outline-variant/30 flex-shrink-0">
+                <div class="flex items-center gap-3 mb-3">
+                    <img id="thread-post-author-avatar" alt="Author" class="w-10 h-10 rounded-full border border-primary/50 object-cover" src=""/>
+                    <div>
+                        <h3 id="thread-post-author-name" class="font-label-caps text-label-caps text-on-surface">@sys_admin_09</h3>
+                        <p id="thread-post-author-username" class="font-status-code text-[10px] text-outline">NODE: VE-LARA-01</p>
+                    </div>
+                </div>
+                <p id="thread-post-content" class="text-on-surface font-body-md text-sm md:text-base drop-shadow-[0_0_5px_rgba(0,219,231,0.2)] max-h-[12vh] overflow-y-auto"></p>
+            </div>
+        </section>
+        
+        <!-- Right Side: Threads & Comments -->
+        <section id="thread-right-comments" class="w-full md:w-1/2 h-1/2 md:h-full flex flex-col bg-surface-container-low/60 relative">
+            <!-- Header -->
+            <header class="p-4 border-b border-outline-variant/30 flex justify-between items-center bg-surface-container-lowest/80 backdrop-blur-md">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">forum</span>
+                    <h1 class="font-label-caps text-label-caps text-on-surface tracking-widest">HILOS DE SÍNTESIS</h1>
+                </div>
+                <div id="thread-comments-count" class="font-status-code text-status-code text-outline text-xs">0 NODOS ACTIVOS</div>
+            </header>
+            
+            <!-- Comments Scroll Area -->
+            <div id="thread-comments-list" class="flex-grow overflow-y-auto p-4 md:p-6 space-y-6">
+                <!-- Loaded dynamically by JS -->
+            </div>
+            
+            <!-- Input Area -->
+            <div class="p-4 bg-surface-container-lowest border-t border-outline-variant/30 mt-auto">
+                <div class="relative group">
+                    <input id="thread-comment-input" class="w-full bg-surface-dim border border-outline-variant rounded-sm py-3 pl-4 pr-12 text-on-surface font-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-300 placeholder-outline-variant/50 group-focus-within:shadow-[0_0_15px_rgba(0,219,231,0.2)]" placeholder="Escribe un reporte de síntesis..." type="text"/>
+                    <input type="hidden" id="thread-comment-parent-id" value="">
+                    <button id="btn-send-thread-comment" class="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-outline hover:text-primary transition-colors hover:scale-110 active:scale-95">
+                        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">send</span>
+                    </button>
+                    <!-- Decorative corner clips -->
+                    <div class="absolute -bottom-1 -right-1 w-2 h-2 border-b border-r border-primary opacity-0 group-focus-within:opacity-100 transition-opacity"></div>
+                    <div class="absolute -top-1 -left-1 w-2 h-2 border-t border-l border-primary opacity-0 group-focus-within:opacity-100 transition-opacity"></div>
+                </div>
+                <!-- Indication if replying to someone -->
+                <div id="thread-reply-indicator" class="text-xs text-primary mt-2 hidden flex justify-between items-center bg-primary/10 p-2 rounded-sm border border-primary/20 font-status-code">
+                    <span>RESPONDIENDO A <b id="thread-reply-username">@user</b></span>
+                    <button id="btn-cancel-reply" class="text-outline hover:text-error text-[10px] font-bold">CANCELAR</button>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- Map Tooltip -->
+<div class="map-tooltip hidden bg-surface-container-high border border-outline-variant p-3 rounded shadow-lg fixed pointer-events-none z-50 text-xs text-on-surface">
+    <!-- Updated by JS -->
+</div>
+
+<!-- Emergency Siren Screen overlay -->
+<div id="emergency-siren-overlay" class="hidden" style="display: none;">
+    <div class="animate-pulse flex flex-col items-center justify-center text-center p-6 bg-black/80 rounded-lg border-2 border-error max-w-md">
+        <span class="material-symbols-outlined text-[64px] text-error mb-4">warning</span>
+        <h2 class="font-display-lg text-2xl text-error mb-2 tracking-widest font-bold">DIFUSIÓN DE EMERGENCIA</h2>
+        <p id="emergency-siren-text" class="font-body-md text-sm text-on-surface-variant mb-6">ALERTA CRÍTICA: Se ha reportado una falla severa en la infraestructura de la red.</p>
+        <button id="btn-dismiss-emergency" class="px-6 py-3 bg-error text-on-error font-status-code rounded hover:shadow-[0_0_15px_rgba(255,180,171,0.6)] glow-btn-red-hover transition-all">CONFIRMAR LECTURA / APAGAR SIRENA</button>
+    </div>
+</div>
+<!-- Modal Historias de Zona -->
+<div id="zone-stories-modal" class="fixed inset-0 bg-background/85 backdrop-blur-sm z-55 hidden flex items-center justify-center p-4">
+    <div class="bg-surface-container-high p-6 rounded-lg border border-primary/50 shadow-[0_0_30px_rgba(0,219,231,0.2)] w-full max-w-lg relative flex flex-col max-h-[85vh]">
+        <button id="close-zone-stories-modal" class="absolute top-3 right-3 text-outline hover:text-primary transition-colors">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+        <h3 class="font-status-code text-primary mb-1 flex items-center gap-2">
+            <span class="material-symbols-outlined">photo_library</span> HISTORIAS GEOLOCALIZADAS
+        </h3>
+        <p id="stories-zone-title" class="font-label-caps text-xs text-outline mb-4">OBELISCO DE BARQUISIMETO</p>
+        
+        <!-- Stories list -->
+        <div id="zone-stories-list" class="flex-grow overflow-y-auto space-y-4 mb-4 pr-1 hide-scrollbar min-h-[150px]">
+            <!-- Load dynamically -->
+            <div class="text-center text-xs text-outline py-8">Cargando historias...</div>
+        </div>
+        
+        <!-- Upload form (only if near) -->
+        <div id="story-upload-container" class="border-t border-outline-variant/30 pt-4 hidden">
+            <h4 class="font-label-caps text-[10px] text-primary mb-2">PUBLICAR TU HISTORIA AQUÍ (RANGO OK)</h4>
+            <form id="form-upload-story" class="flex flex-col gap-3">
+                <input type="hidden" id="story-zone-id" value="">
+                <textarea id="story-content" class="w-full bg-surface-dim border border-outline-variant text-on-surface text-xs rounded p-2 outline-none focus:border-primary resize-none h-14 font-body-md" placeholder="¿Qué está pasando aquí ahora mismo?" required></textarea>
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <label class="text-outline hover:text-primary transition-colors p-1 cursor-pointer flex items-center gap-1 text-[10px] font-label-caps" title="Añadir Imagen">
+                            <span class="material-symbols-outlined text-sm">image</span>
+                            <span>AÑADIR FOTO</span>
+                            <input type="file" id="story-image" class="hidden" accept="image/*">
+                        </label>
+                        <span id="story-image-name" class="text-[8px] text-outline truncate max-w-[120px]"></span>
+                    </div>
+                    <button type="submit" class="px-4 py-1.5 bg-primary text-on-primary rounded text-xs hover:shadow-[0_0_10px_rgba(0,219,231,0.5)] font-status-code">TRANSMITIR HISTORIA</button>
+                </div>
+            </form>
+        </div>
+        <div id="story-upload-range-error" class="border-t border-outline-variant/30 pt-4 text-center text-[10px] text-error bg-error/10 p-2 rounded border border-error/20 font-label-caps">
+            ⚠️ Bloqueo de GPS: Debes estar a menos de 200m de esta zona para poder transmitir una historia aquí.
+        </div>
+    </div>
+</div>
+
+<!-- Modal Crear Meetup (Activity Pin) -->
+<div id="create-meetup-modal" class="fixed inset-0 bg-background/85 backdrop-blur-sm z-55 hidden flex items-center justify-center p-4">
+    <div class="bg-surface-container-high p-6 rounded-lg border border-primary/50 shadow-[0_0_30px_rgba(0,219,231,0.2)] w-full max-w-sm relative z-55">
+        <button id="close-create-meetup-modal" class="absolute top-3 right-3 text-outline hover:text-primary transition-colors">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+        <h3 class="font-status-code text-primary mb-4 flex items-center gap-2">
+            <span class="material-symbols-outlined">add_location_alt</span> INICIAR RADAR DE ACTIVIDAD
+        </h3>
+        <form id="form-create-meetup" class="flex flex-col gap-4">
+            <div>
+                <label class="font-label-caps text-[10px] text-outline block mb-1">ACTIVIDAD / INTERÉS</label>
+                <select id="meetup-activity" class="w-full bg-surface-dim border border-outline-variant text-on-surface font-label-caps text-xs rounded px-3 py-2 outline-none focus:border-primary" required>
+                    <option value="Fútbol">⚽ FÚTBOL</option>
+                    <option value="Café">☕ SALIR POR UN CAFÉ</option>
+                    <option value="Juegos de mesa">🎲 JUEGOS DE MESA</option>
+                    <option value="Música">🎵 MÚSICA / EVENTOS</option>
+                    <option value="Charlar">💬 CONOCER GENTE / CHARLAR</option>
+                    <option value="Cine">🎬 IR AL CINE</option>
+                </select>
+            </div>
+            <div>
+                <label class="font-label-caps text-[10px] text-outline block mb-1">¿QUÉ TIENES PLANEADO HACER?</label>
+                <textarea id="meetup-description" class="w-full bg-surface-dim border border-outline-variant text-on-surface text-xs rounded p-2 outline-none focus:border-primary resize-none h-20 font-body-md" placeholder="Ej: Busco gente para una partida de fútbol en la plaza a las 5pm..." required></textarea>
+            </div>
+            <div class="text-[9px] text-outline bg-primary/10 p-2 rounded border border-primary/20 flex flex-col gap-0.5 font-status-code">
+                <div class="flex justify-between"><span>MUNICIPIO ACTIVO:</span> <span id="meetup-location-lbl" class="font-bold text-primary">--</span></div>
+                <div class="flex justify-between"><span>COORDENADAS GPS:</span> <span id="meetup-coords-lbl" class="font-status-code">--.----, --.----</span></div>
+            </div>
+            <div class="flex justify-end gap-2 mt-2">
+                <button type="button" id="btn-cancel-meetup" class="px-4 py-2 text-outline hover:text-on-surface text-sm">Cancelar</button>
+                <button type="submit" class="px-4 py-2 bg-primary text-on-primary rounded text-sm hover:shadow-[0_0_10px_rgba(0,219,231,0.5)] font-status-code">Encender Pin en Mapa</button>
+            </div>
+        </form>
+</div>
+</div>
+
+<!-- Bottom Navigation Bar (Mobile only) -->
+<div class="fixed bottom-0 left-0 right-0 h-16 bg-background/95 border-t border-outline-variant/60 backdrop-blur-md flex justify-around items-center z-40 md:hidden shadow-[0_-2px_15px_rgba(0,219,231,0.2)]">
+    <button class="mobile-nav-btn flex flex-col items-center justify-center gap-1 text-outline hover:text-primary" data-target="column-map">
+        <span class="material-symbols-outlined text-[20px]">map</span>
+        <span class="text-[8px] font-label-caps tracking-widest font-bold">MAPA</span>
+    </button>
+    <button class="mobile-nav-btn flex flex-col items-center justify-center gap-1 text-outline hover:text-primary" data-target="column-feed">
+        <span class="material-symbols-outlined text-[20px]">forum</span>
+        <span class="text-[8px] font-label-caps tracking-widest font-bold">MURO</span>
+    </button>
+    <button class="mobile-nav-btn flex flex-col items-center justify-center gap-1 text-outline hover:text-primary" data-target="column-radar">
+        <span class="material-symbols-outlined text-[20px]">terminal</span>
+        <span class="text-[8px] font-label-caps tracking-widest font-bold">OPERACIONES</span>
+    </button>
+    <a href="/nodes" class="mobile-nav-btn flex flex-col items-center justify-center gap-1 text-outline hover:text-primary">
+        <span class="material-symbols-outlined text-[20px]">group</span>
+        <span class="text-[8px] font-label-caps tracking-widest font-bold">NODOS</span>
+    </a>
+</div>
+
+<div id="glitch-overlay"></div>
+
+</body>
+</html>
