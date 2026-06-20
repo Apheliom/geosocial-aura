@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html class="dark" lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GeoSocial - Login</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&amp;family=JetBrains+Mono:wght@400..800&amp;family=Space+Grotesk:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="tailwind-config.js?v=4"></script>
+<link rel="stylesheet" href="styles.css?v=4">
+<script src="app.js?v=3" defer></script>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen relative overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container flex items-center justify-center">
+<div class="fixed inset-0 scanline z-50 mix-blend-overlay"></div>
+
+<main class="w-full max-w-md bg-surface-container-low/90 backdrop-blur-md rounded-lg border border-outline-variant p-8 shadow-[0_0_20px_rgba(0,219,231,0.2)] relative z-10 mx-4">
+    <div class="text-center mb-8">
+        <h1 class="font-display-lg text-headline-lg tracking-tighter text-primary animate-pulse mb-2">GEOSOCIAL</h1>
+        <p class="text-on-surface-variant font-label-caps text-xs">INICIAR CONEXIÓN AL NODO CENTRAL</p>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <form id="form-login" class="flex flex-col gap-4">
+        <div>
+            <label class="font-label-caps text-[10px] text-outline block mb-1">USUARIO</label>
+            <input type="text" id="login-username" class="w-full bg-surface-dim border border-outline-variant text-on-surface font-body-md rounded px-3 py-2 focus:border-primary outline-none custom-focus-ring" required>
+        </div>
+        <div>
+            <label class="font-label-caps text-[10px] text-outline block mb-1">CONTRASEÑA</label>
+            <input type="password" id="login-password" class="w-full bg-surface-dim border border-outline-variant text-on-surface font-body-md rounded px-3 py-2 focus:border-primary outline-none custom-focus-ring" required>
+        </div>
+        <button type="submit" class="bg-primary text-on-primary font-status-code px-4 py-2 rounded hover:shadow-[0_0_15px_rgba(0,219,231,0.5)] transition-all w-full mt-2 custom-focus-ring">ACCEDER AL MAPA</button>
+        <p class="text-center text-xs text-on-surface-variant mt-2">
+            ¿Nodo no registrado? <a href="#" id="show-register" class="text-primary hover:underline">Crear cuenta</a>
+        </p>
+    </form>
+
+    <!-- REGISTER FORM -->
+    <form id="form-register" class="flex flex-col gap-4 hidden">
+        <div>
+            <label class="font-label-caps text-[10px] text-outline block mb-1">NOMBRE PÚBLICO</label>
+            <input type="text" id="reg-name" class="w-full bg-surface-dim border border-outline-variant text-on-surface font-body-md rounded px-3 py-2 focus:border-primary outline-none custom-focus-ring" required>
+        </div>
+        <div>
+            <label class="font-label-caps text-[10px] text-outline block mb-1">USUARIO (TAG)</label>
+            <input type="text" id="reg-username" class="w-full bg-surface-dim border border-outline-variant text-on-surface font-body-md rounded px-3 py-2 focus:border-primary outline-none custom-focus-ring" required>
+        </div>
+        <div>
+            <label class="font-label-caps text-[10px] text-outline block mb-1">CONTRASEÑA</label>
+            <input type="password" id="reg-password" class="w-full bg-surface-dim border border-outline-variant text-on-surface font-body-md rounded px-3 py-2 focus:border-primary outline-none custom-focus-ring" required>
+        </div>
+        <button type="submit" class="bg-secondary text-on-secondary font-status-code px-4 py-2 rounded hover:shadow-[0_0_15px_rgba(255,171,243,0.5)] transition-all w-full mt-2 custom-focus-ring">REGISTRAR NODO</button>
+
+        <p class="text-center text-xs text-on-surface-variant mt-2">
+            ¿Ya tienes acceso? <a href="#" id="show-login" class="text-primary hover:underline">Iniciar conexión</a>
+        </p>
+    </form>
+</main>
+</body>
+</html>
